@@ -2,11 +2,14 @@ import { supabase } from "./supabaseClient";
 
 // Not yet wired into the UI. Built out fully in Stage 3.
 
-export async function signUp(email, password, name) {
+export async function signUp(email, password, name, role) {
   return supabase.auth.signUp({
     email,
     password,
-    options: { data: { name } },
+    // Only self-service roles are ever sent here (enforced in RoleSelect.jsx).
+    // The database trigger also independently blocks "moderator" regardless
+    // of what's sent, so this is a defense-in-depth measure, not the only one.
+    options: { data: { name, role } },
   });
 }
 
