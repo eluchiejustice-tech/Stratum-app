@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { X } from "lucide-react";
-import { MINERAL_COLORS, bandsFor } from "../utils/mineralColors";
+import { MINERAL_COLORS } from "../utils/mineralColors";
 
 export default function AddListingModal({ onClose, onAdd }) {
   const [form, setForm] = useState({
     mineral: "Gold",
     grade: "",
     quantity: "",
+    state: "",
     location: "",
     seller: "",
     contact: "",
@@ -15,13 +16,8 @@ export default function AddListingModal({ onClose, onAdd }) {
   });
 
   const submit = () => {
-    if (!form.grade || !form.quantity || !form.location || !form.seller || !form.contact) return;
-    onAdd({
-      id: "l" + Date.now(),
-      ...form,
-      verified: false,
-      strata: bandsFor(form.mineral),
-    });
+    if (!form.grade || !form.quantity || !form.state || !form.location || !form.seller || !form.contact) return;
+    onAdd(form);
     onClose();
   };
 
@@ -66,11 +62,20 @@ export default function AddListingModal({ onClose, onAdd }) {
             />
           </div>
           <div>
+            <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">State</label>
+            <input
+              value={form.state}
+              onChange={(e) => setForm({ ...form, state: e.target.value })}
+              placeholder="e.g. Ekiti, Nasarawa, Kaduna"
+              className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
             <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">Location</label>
             <input
               value={form.location}
               onChange={(e) => setForm({ ...form, location: e.target.value })}
-              placeholder="Region, country"
+              placeholder="Town, LGA, or mining community"
               className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
             />
           </div>
