@@ -5,8 +5,8 @@ import FilterChips from "../components/FilterChips";
 import ListingCard from "../components/ListingCard";
 import ConsultingBanner from "../components/ConsultingBanner";
 import AddListingModal from "../components/AddListingModal";
-import LoginForm from "../components/LoginForm";
 import { MINERAL_COLORS } from "../utils/mineralColors";
+import { useAuthContext } from "../context/AuthContext";
 
 const SEED_LISTINGS = [
   {
@@ -52,12 +52,9 @@ export default function MarketplacePage() {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [showLogin, setShowLogin] = useState(false);
-  const [passcodeInput, setPasscodeInput] = useState("");
-  const [loginError, setLoginError] = useState(false);
 
-  const ADMIN_PASSCODE = "stratum2026";
+  const { role } = useAuthContext();
+  const isModerator = role === "moderator";
 
   useEffect(() => {
     try {
@@ -91,17 +88,6 @@ export default function MarketplacePage() {
     persist(listings.filter((l) => l.id !== id));
   };
 
-  const tryLogin = () => {
-    if (passcodeInput === ADMIN_PASSCODE) {
-      setIsAdmin(true);
-      setShowLogin(false);
-      setPasscodeInput("");
-      setLoginError(false);
-    } else {
-      setLoginError(true);
-    }
-  };
-
   const minerals = ["All", ...Object.keys(MINERAL_COLORS)];
   const visible = listings.filter((l) => {
     const matchesFilter = filter === "All" || l.mineral === filter;
@@ -118,11 +104,7 @@ export default function MarketplacePage() {
       className="min-h-screen bg-[#EDE8DC] text-[#15130F]"
       style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
     >
-      <Header
-        isAdmin={isAdmin}
-        onToggleAdmin={() => (isAdmin ? setIsAdmin(false) : setShowLogin(true))}
-        onAddListing={() => setShowAdd(true)}
-      />
+      <Header onAddListing={() => setShowAdd(true)} />
 
       <main className="max-w-4xl mx-auto px-5 sm:px-8 py-6">
         <div className="mb-5 space-y-3">
@@ -143,7 +125,7 @@ export default function MarketplacePage() {
             <ListingCard
               key={l.id}
               listing={l}
-              isAdmin={isAdmin}
+              isAdmin={isModerator}
               onVerify={verifyListing}
               onReject={rejectListing}
             />
@@ -158,21 +140,6 @@ export default function MarketplacePage() {
       </main>
 
       {showAdd && <AddListingModal onClose={() => setShowAdd(false)} onAdd={addListing} />}
-
-      {showLogin && (
-        <LoginForm
-          passcodeInput={passcodeInput}
-          setPasscodeInput={setPasscodeInput}
-          loginError={loginError}
-          setLoginError={setLoginError}
-          onSubmit={tryLogin}
-          onClose={() => {
-            setShowLogin(false);
-            setLoginError(false);
-            setPasscodeInput("");
-          }}
-        />
-      )}
     </div>
   );
 }
