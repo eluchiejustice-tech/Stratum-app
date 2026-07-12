@@ -43,7 +43,7 @@ export default function ListingCard({ listing, isAdmin, onVerify, onReject }) {
         <div className="flex items-center justify-between mt-3">
           <div>
             <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50">
-              {l.seller}
+              {l.company || l.seller}
             </div>
             <div className="text-sm font-mono text-[#1F4D3D] mt-0.5">{l.price}</div>
           </div>
