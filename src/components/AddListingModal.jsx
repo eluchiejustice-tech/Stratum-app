@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { MINERAL_COLORS } from "../utils/mineralColors";
+import { supabase } from "../services/supabaseClient";
 
 export default function AddListingModal({ onClose, onAdd }) {
   const [form, setForm] = useState({
@@ -16,9 +17,38 @@ export default function AddListingModal({ onClose, onAdd }) {
     price: "",
     photoUrl: "",
   });
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    setUploadError("");
+
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+
+    const { error: uploadErr } = await supabase.storage
+      .from("listing-photos")
+      .upload(fileName, file);
+
+    if (uploadErr) {
+      console.error("Photo upload failed", uploadErr);
+      setUploadError("Upload failed. Please try again.");
+      setUploading(false);
+      return;
+    }
+
+    const { data } = supabase.storage.from("listing-photos").getPublicUrl(fileName);
+    setForm((f) => ({ ...f, photoUrl: data.publicUrl }));
+    setUploading(false);
+  };
 
   const submit = () => {
     if (!form.grade || !form.quantity || !form.state || !form.location || !form.seller || !form.contact) return;
+    if (uploading) return;
     onAdd(form);
     onClose();
   };
@@ -93,66 +123,4 @@ export default function AddListingModal({ onClose, onAdd }) {
             />
           </div>
           <div>
-            <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">Seller name</label>
-            <input
-              value={form.seller}
-              onChange={(e) => setForm({ ...form, seller: e.target.value })}
-              className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">Company (optional)</label>
-            <input
-              value={form.company}
-              onChange={(e) => setForm({ ...form, company: e.target.value })}
-              placeholder="e.g. Adewale Minerals Co."
-              className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">Contact (phone or email)</label>
-            <input
-              value={form.contact}
-              onChange={(e) => setForm({ ...form, contact: e.target.value })}
-              placeholder="e.g. +234... or you@company.com"
-              className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">Price</label>
-            <input
-              value={form.price}
-              onChange={(e) => setForm({ ...form, price: e.target.value })}
-              placeholder="e.g. $1,150/tonne or Negotiable"
-              className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">
-              Photo or assay report link (optional)
-            </label>
-            <input
-              value={form.photoUrl}
-              onChange={(e) => setForm({ ...form, photoUrl: e.target.value })}
-              placeholder="Paste a Google Photos, Drive, or Imgur link"
-              className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
-            />
-            <p className="text-[10px] text-[#3D4148]/60 mt-1">
-              Upload your photo/document to Google Photos or Drive first, set sharing to
-              "Anyone with the link," then paste the link here.
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={submit}
-          className="w-full mt-5 bg-[#15130F] text-[#EDE8DC] font-mono text-sm uppercase tracking-wide py-3 rounded hover:bg-[#3D4148] transition"
-        >
-          Submit for review
-        </button>
-        <p className="text-xs text-[#3D4148]/70 mt-2 text-center">
-          New listings show as "Pending review" until your team verifies them.
-        </p>
-      </div>
-    </div>
-  );
-}
+            <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">S
