@@ -10,6 +10,7 @@ export default function AddListingModal({ onClose, onAdd }) {
     state: "",
     location: "",
     seller: "",
+    company: "",
     contact: "",
     price: "",
     photoUrl: "",
@@ -80,10 +81,19 @@ export default function AddListingModal({ onClose, onAdd }) {
             />
           </div>
           <div>
-            <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">Seller / company name</label>
+            <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">Seller name</label>
             <input
               value={form.seller}
               onChange={(e) => setForm({ ...form, seller: e.target.value })}
+              className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">Company (optional)</label>
+            <input
+              value={form.company}
+              onChange={(e) => setForm({ ...form, company: e.target.value })}
+              placeholder="e.g. Adewale Minerals Co."
               className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
             />
           </div>
