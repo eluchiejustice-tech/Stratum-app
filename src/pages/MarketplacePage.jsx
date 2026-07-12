@@ -22,7 +22,7 @@ import {
 // of this file rather than reconstructing it from memory.
 // ============================================================
 
-export default function MarketplacePage() {
+export default function MarketplacePage({ onSellerClick }) {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -36,6 +36,7 @@ export default function MarketplacePage() {
   // so ListingCard.jsx itself needs no changes.
   const cardListings = listings.map((row) => ({
     id: row.id,
+    sellerId: row.seller_id,
     mineral: row.mineral,
     grade: row.mineral_grade,
     quantity: row.quantity,
@@ -160,6 +161,7 @@ export default function MarketplacePage() {
                 isAdmin={isModerator}
                 onVerify={verifyListing}
                 onReject={rejectListing}
+                onSellerClick={onSellerClick}
               />
             ))}
         </div>
