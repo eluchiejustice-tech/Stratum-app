@@ -8,6 +8,7 @@ export default function AddListingModal({ onClose, onAdd }) {
     grade: "",
     quantity: "",
     state: "",
+    lga: "",
     location: "",
     seller: "",
     company: "",
@@ -72,11 +73,22 @@ export default function AddListingModal({ onClose, onAdd }) {
             />
           </div>
           <div>
+            <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">
+              Local Government Area (optional)
+            </label>
+            <input
+              value={form.lga}
+              onChange={(e) => setForm({ ...form, lga: e.target.value })}
+              placeholder="e.g. Jos North, Ijero"
+              className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
             <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">Location</label>
             <input
               value={form.location}
               onChange={(e) => setForm({ ...form, location: e.target.value })}
-              placeholder="Town, LGA, or mining community"
+              placeholder="Town, or mining community"
               className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
             />
           </div>
