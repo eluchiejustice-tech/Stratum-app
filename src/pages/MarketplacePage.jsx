@@ -39,7 +39,9 @@ export default function MarketplacePage() {
     mineral: row.mineral,
     grade: row.mineral_grade,
     quantity: row.quantity,
-    location: [row.location, row.state, row.country].filter(Boolean).join(", "),
+    location: [row.location, row.local_government_area, row.state, row.country]
+      .filter(Boolean)
+      .join(", "),
     seller: row.seller_name,
     company: row.seller_company,
     contact: row.seller_contact,
@@ -59,6 +61,7 @@ export default function MarketplacePage() {
       mineral_grade: form.grade,
       country: "Nigeria",
       state: form.state,
+      local_government_area: form.lga,
       location: form.location,
       availability: "in_stock",
       price: form.price,
