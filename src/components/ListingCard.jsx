@@ -3,8 +3,11 @@ import CoreSample from "./CoreSample";
 import VerifiedBadge from "./VerifiedBadge";
 import { contactHref } from "../utils/contactHref";
 
-export default function ListingCard({ listing, isAdmin, onVerify, onReject }) {
+export default function ListingCard({ listing, isAdmin, onVerify, onReject, onSellerClick }) {
   const l = listing;
+  const sellerLabel = l.company || l.seller;
+  const canOpenSellerProfile = Boolean(onSellerClick && l.sellerId);
+
   return (
     <div className="bg-white rounded-lg p-4 flex gap-4 shadow-sm border border-[#3D4148]/10">
       <CoreSample bands={l.strata} />
@@ -42,9 +45,19 @@ export default function ListingCard({ listing, isAdmin, onVerify, onReject }) {
         </div>
         <div className="flex items-center justify-between mt-3">
           <div>
-            <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50">
-              {l.company || l.seller}
-            </div>
+            {canOpenSellerProfile ? (
+              <button
+                onClick={() => onSellerClick(l.sellerId)}
+                title="View seller profile"
+                className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 hover:text-[#1F4D3D] hover:underline transition text-left"
+              >
+                {sellerLabel}
+              </button>
+            ) : (
+              <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50">
+                {sellerLabel}
+              </div>
+            )}
             <div className="text-sm font-mono text-[#1F4D3D] mt-0.5">{l.price}</div>
           </div>
           <div className="flex items-center gap-2">
