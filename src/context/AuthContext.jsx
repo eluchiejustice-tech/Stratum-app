@@ -1,11 +1,6 @@
-
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
 import { getProfile } from "../services/auth";
-
-// Not yet wrapped around the app — wiring happens in Stage 3.
-// Once connected, any component can call useAuthContext() to read
-// { user, profile, role, loading } instead of managing auth state itself.
 
 const AuthContext = createContext(null);
 
@@ -27,19 +22,25 @@ export function AuthProvider({ children }) {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
+  const refreshProfile = useCallback(async () => {
     if (!user) {
       setProfile(null);
       return;
     }
-    getProfile(user.id).then(({ data }) => setProfile(data));
+    const { data } = await getProfile(user.id);
+    setProfile(data);
   }, [user]);
+
+  useEffect(() => {
+    refreshProfile();
+  }, [refreshProfile]);
 
   const value = {
     user,
     profile,
     role: profile?.role ?? null,
     loading,
+    refreshProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
