@@ -3,11 +3,61 @@ import { X } from "lucide-react";
 import { MINERAL_COLORS } from "../utils/mineralColors";
 import { supabase } from "../services/supabaseClient";
 
+const QUANTITY_UNITS = ["kg", "g", "tonnes", "tons", "lb", "oz"];
+
+const PRICE_PHRASES = [
+  "negotiable",
+  "contact for quote",
+  "contact for price",
+  "price on request",
+];
+
+// Loose, intentionally permissive — a light nudge, not a hard gate.
+// Matches things like "$1,150/tonne", "1150", "₦50,000", "1,150 / kg".
+const PRICE_PATTERN = /^[$₦€£]?\s?[\d,]+(\.\d+)?(\s?\/\s?\w+)?$/;
+
+const PHONE_PATTERN = /^[+\d][\d\s\-()]{6,19}$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function validate(form) {
+  const errors = {};
+
+  if (!form.grade.trim()) errors.grade = "Grade / spec is required.";
+
+  if (!form.quantityAmount.trim()) {
+    errors.quantityAmount = "Quantity is required.";
+  } else if (isNaN(Number(form.quantityAmount)) || Number(form.quantityAmount) <= 0) {
+    errors.quantityAmount = "Enter a valid positive number.";
+  }
+
+  if (!form.state.trim()) errors.state = "State is required.";
+  if (!form.location.trim()) errors.location = "Location is required.";
+  if (!form.seller.trim()) errors.seller = "Seller name is required.";
+
+  const contact = form.contact.trim();
+  if (!contact) {
+    errors.contact = "Contact is required.";
+  } else if (!PHONE_PATTERN.test(contact) && !EMAIL_PATTERN.test(contact)) {
+    errors.contact = "Enter a valid phone number or email address.";
+  }
+
+  return errors;
+}
+
+function getPriceWarning(price) {
+  const trimmed = price.trim();
+  if (!trimmed) return null;
+  if (PRICE_PHRASES.includes(trimmed.toLowerCase())) return null;
+  if (PRICE_PATTERN.test(trimmed)) return null;
+  return 'Add a number (e.g. $1,150/tonne) or write "Negotiable".';
+}
+
 export default function AddListingModal({ onClose, onAdd }) {
   const [form, setForm] = useState({
     mineral: "Gold",
     grade: "",
-    quantity: "",
+    quantityAmount: "",
+    quantityUnit: "kg",
     state: "",
     lga: "",
     location: "",
@@ -17,8 +67,22 @@ export default function AddListingModal({ onClose, onAdd }) {
     price: "",
     photoUrl: "",
   });
+  const [errors, setErrors] = useState({});
+  const [priceWarning, setPriceWarning] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+
+  const updateField = (field, value) => {
+    setForm((f) => ({ ...f, [field]: value }));
+    if (errors[field]) {
+      setErrors((e) => ({ ...e, [field]: undefined }));
+    }
+  };
+
+  const handlePriceChange = (value) => {
+    setForm((f) => ({ ...f, price: value }));
+    setPriceWarning(getPriceWarning(value));
+  };
 
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
@@ -47,9 +111,27 @@ export default function AddListingModal({ onClose, onAdd }) {
   };
 
   const submit = () => {
-    if (!form.grade || !form.quantity || !form.state || !form.location || !form.seller || !form.contact) return;
+    const validationErrors = validate(form);
+    setErrors(validationErrors);
+
+    if (Object.keys(validationErrors).length > 0) return;
     if (uploading) return;
-    onAdd(form);
+
+    const quantity = `${form.quantityAmount.trim()} ${form.quantityUnit}`;
+
+    onAdd({
+      mineral: form.mineral,
+      grade: form.grade.trim(),
+      quantity,
+      state: form.state.trim(),
+      lga: form.lga.trim(),
+      location: form.location.trim(),
+      seller: form.seller.trim(),
+      company: form.company.trim(),
+      contact: form.contact.trim(),
+      price: form.price.trim(),
+      photoUrl: form.photoUrl,
+    });
     onClose();
   };
 
@@ -67,7 +149,7 @@ export default function AddListingModal({ onClose, onAdd }) {
             <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">Mineral</label>
             <select
               value={form.mineral}
-              onChange={(e) => setForm({ ...form, mineral: e.target.value })}
+              onChange={(e) => updateField("mineral", e.target.value)}
               className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
             >
               {Object.keys(MINERAL_COLORS).map((m) => (
@@ -75,88 +157,137 @@ export default function AddListingModal({ onClose, onAdd }) {
               ))}
             </select>
           </div>
+
           <div>
             <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">Grade / spec</label>
             <input
               value={form.grade}
-              onChange={(e) => setForm({ ...form, grade: e.target.value })}
+              onChange={(e) => updateField("grade", e.target.value)}
               placeholder="e.g. 91.6% purity, unassayed"
-              className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
+              className={`w-full mt-1 bg-white border rounded px-3 py-2 text-sm ${
+                errors.grade ? "border-[#8a3b3b]" : "border-[#3D4148]/20"
+              }`}
             />
+            {errors.grade && <p className="text-[10px] text-[#8a3b3b] mt-1">{errors.grade}</p>}
           </div>
+
           <div>
             <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">Quantity</label>
-            <input
-              value={form.quantity}
-              onChange={(e) => setForm({ ...form, quantity: e.target.value })}
-              placeholder="e.g. 2.5 kg, 40 tonnes"
-              className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
-            />
+            <div className="flex gap-2 mt-1">
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={form.quantityAmount}
+                onChange={(e) => updateField("quantityAmount", e.target.value)}
+                placeholder="e.g. 35"
+                className={`flex-1 bg-white border rounded px-3 py-2 text-sm ${
+                  errors.quantityAmount ? "border-[#8a3b3b]" : "border-[#3D4148]/20"
+                }`}
+              />
+              <select
+                value={form.quantityUnit}
+                onChange={(e) => updateField("quantityUnit", e.target.value)}
+                className="bg-white border border-[#3D4148]/20 rounded px-2 py-2 text-sm"
+              >
+                {QUANTITY_UNITS.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {errors.quantityAmount && (
+              <p className="text-[10px] text-[#8a3b3b] mt-1">{errors.quantityAmount}</p>
+            )}
           </div>
+
           <div>
             <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">State</label>
             <input
               value={form.state}
-              onChange={(e) => setForm({ ...form, state: e.target.value })}
+              onChange={(e) => updateField("state", e.target.value)}
               placeholder="e.g. Ekiti, Nasarawa, Kaduna"
-              className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
+              className={`w-full mt-1 bg-white border rounded px-3 py-2 text-sm ${
+                errors.state ? "border-[#8a3b3b]" : "border-[#3D4148]/20"
+              }`}
             />
+            {errors.state && <p className="text-[10px] text-[#8a3b3b] mt-1">{errors.state}</p>}
           </div>
+
           <div>
             <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">
               Local Government Area (optional)
             </label>
             <input
               value={form.lga}
-              onChange={(e) => setForm({ ...form, lga: e.target.value })}
+              onChange={(e) => updateField("lga", e.target.value)}
               placeholder="e.g. Jos North, Ijero"
               className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
             />
           </div>
+
           <div>
             <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">Location</label>
             <input
               value={form.location}
-              onChange={(e) => setForm({ ...form, location: e.target.value })}
+              onChange={(e) => updateField("location", e.target.value)}
               placeholder="Town, or mining community"
-              className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
+              className={`w-full mt-1 bg-white border rounded px-3 py-2 text-sm ${
+                errors.location ? "border-[#8a3b3b]" : "border-[#3D4148]/20"
+              }`}
             />
+            {errors.location && <p className="text-[10px] text-[#8a3b3b] mt-1">{errors.location}</p>}
           </div>
+
           <div>
             <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">Seller name</label>
             <input
               value={form.seller}
-              onChange={(e) => setForm({ ...form, seller: e.target.value })}
-              className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
+              onChange={(e) => updateField("seller", e.target.value)}
+              className={`w-full mt-1 bg-white border rounded px-3 py-2 text-sm ${
+                errors.seller ? "border-[#8a3b3b]" : "border-[#3D4148]/20"
+              }`}
             />
+            {errors.seller && <p className="text-[10px] text-[#8a3b3b] mt-1">{errors.seller}</p>}
           </div>
+
           <div>
             <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">Company (optional)</label>
             <input
               value={form.company}
-              onChange={(e) => setForm({ ...form, company: e.target.value })}
+              onChange={(e) => updateField("company", e.target.value)}
               placeholder="e.g. Adewale Minerals Co."
               className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
             />
           </div>
+
           <div>
             <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">Contact (phone or email)</label>
             <input
               value={form.contact}
-              onChange={(e) => setForm({ ...form, contact: e.target.value })}
+              onChange={(e) => updateField("contact", e.target.value)}
               placeholder="e.g. +234... or you@company.com"
-              className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
+              className={`w-full mt-1 bg-white border rounded px-3 py-2 text-sm ${
+                errors.contact ? "border-[#8a3b3b]" : "border-[#3D4148]/20"
+              }`}
             />
+            {errors.contact && <p className="text-[10px] text-[#8a3b3b] mt-1">{errors.contact}</p>}
           </div>
+
           <div>
             <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">Price</label>
             <input
               value={form.price}
-              onChange={(e) => setForm({ ...form, price: e.target.value })}
+              onChange={(e) => handlePriceChange(e.target.value)}
               placeholder="e.g. $1,150/tonne or Negotiable"
               className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
             />
+            {priceWarning && (
+              <p className="text-[10px] text-[#9c7a1f] mt-1">{priceWarning}</p>
+            )}
           </div>
+
           <div>
             <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">
               Mineral photo (optional)
