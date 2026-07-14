@@ -7,6 +7,10 @@ export async function getListings() {
     .order("created_at", { ascending: false });
 }
 
+export async function getListingById(id) {
+  return supabase.from("mineral_listings").select("*").eq("id", id).single();
+}
+
 export async function createListing(listing) {
   return supabase.from("mineral_listings").insert(listing).select().single();
 }
