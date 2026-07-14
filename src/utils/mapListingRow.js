@@ -18,6 +18,7 @@ export function mapListingRow(row) {
     company: row.seller_company,
     contact: row.seller_contact,
     verified: row.status === "verified",
+    statusRaw: row.status,
     price: row.price,
     photoUrl: row.photo_url,
     documentUrl: row.document_url,
