@@ -11,6 +11,14 @@ export async function getListingById(id) {
   return supabase.from("mineral_listings").select("*").eq("id", id).single();
 }
 
+export async function getListingsBySeller(sellerId) {
+  return supabase
+    .from("mineral_listings")
+    .select("*")
+    .eq("seller_id", sellerId)
+    .order("created_at", { ascending: false });
+}
+
 export async function createListing(listing) {
   return supabase.from("mineral_listings").insert(listing).select().single();
 }
