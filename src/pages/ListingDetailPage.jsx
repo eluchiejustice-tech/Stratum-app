@@ -1,51 +1,85 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, MapPin, MessageCircle, FileText } from "lucide-react";
 import CoreSample from "../components/CoreSample";
 import VerifiedBadge from "../components/VerifiedBadge";
 import { contactHref } from "../utils/contactHref";
 import { mapListingRow } from "../utils/mapListingRow";
-import { getListingById } from "../services/listings";
+import {
+  getListingById,
+  updateListingStatus,
+  createVerificationRecord,
+} from "../services/listings";
+import { useAuthContext } from "../context/AuthContext";
 
-export default function ListingDetailPage({
-  listingId,
-  isAdmin,
-  onBack,
-  onVerify,
-  onReject,
-  onSellerClick,
-}) {
+export default function ListingDetailPage({ listingId, onBack, onSellerClick }) {
+  const { user, role } = useAuthContext();
+  const isAdmin = role === "moderator";
+
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const loadListing = useCallback(async () => {
+    if (!listingId) return;
+
+    setLoading(true);
+    setError(null);
+
+    const { data, error: fetchError } = await getListingById(listingId);
+
+    if (fetchError) {
+      console.error("Failed to load listing", fetchError);
+      setError(true);
+      setLoading(false);
+      return;
+    }
+
+    setListing(mapListingRow(data));
+    setLoading(false);
+  }, [listingId]);
+
   useEffect(() => {
     let cancelled = false;
 
-    async function load() {
-      setLoading(true);
-      setError(null);
-
-      const { data, error: fetchError } = await getListingById(listingId);
-
+    async function run() {
+      await loadListing();
       if (cancelled) return;
-
-      if (fetchError) {
-        console.error("Failed to load listing", fetchError);
-        setError(true);
-        setLoading(false);
-        return;
-      }
-
-      setListing(mapListingRow(data));
-      setLoading(false);
     }
 
-    if (listingId) load();
+    run();
 
     return () => {
       cancelled = true;
     };
-  }, [listingId]);
+  }, [loadListing]);
+
+  const verifyListing = async () => {
+    const { error: updateError } = await updateListingStatus(listing.id, "verified");
+    if (!updateError) {
+      await createVerificationRecord({
+        verification_type: "listing",
+        reference_id: listing.id,
+        verified_by: user.id,
+        status: "verified",
+        notes: null,
+      });
+    }
+    await loadListing();
+  };
+
+  const rejectListing = async () => {
+    const { error: updateError } = await updateListingStatus(listing.id, "rejected");
+    if (!updateError) {
+      await createVerificationRecord({
+        verification_type: "listing",
+        reference_id: listing.id,
+        verified_by: user.id,
+        status: "rejected",
+        notes: null,
+      });
+    }
+    await loadListing();
+  };
 
   const canOpenSellerProfile = Boolean(onSellerClick && listing?.sellerId);
 
@@ -180,7 +214,7 @@ export default function ListingDetailPage({
               <div className="flex items-center gap-2">
                 {isAdmin && !listing.verified && (
                   <button
-                    onClick={() => onVerify(listing.id)}
+                    onClick={verifyListing}
                     className="bg-[#1F4D3D] text-[#EDE8DC] text-xs font-mono uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition"
                   >
                     Approve
@@ -188,7 +222,7 @@ export default function ListingDetailPage({
                 )}
                 {isAdmin && (
                   <button
-                    onClick={() => onReject(listing.id)}
+                    onClick={rejectListing}
                     className="bg-[#8a3b3b] text-[#EDE8DC] text-xs font-mono uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition"
                   >
                     Remove
