@@ -23,7 +23,7 @@ import {
 // of this file rather than reconstructing it from memory.
 // ============================================================
 
-export default function MarketplacePage({ onSellerClick, onListingClick }) {
+export default function MarketplacePage({ onSellerClick, onListingClick, onMyListings }) {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -110,7 +110,7 @@ export default function MarketplacePage({ onSellerClick, onListingClick }) {
       className="min-h-screen bg-[#EDE8DC] text-[#15130F]"
       style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
     >
-      <Header onAddListing={() => setShowAdd(true)} />
+      <Header onAddListing={() => setShowAdd(true)} onMyListings={onMyListings} />
 
       <main className="max-w-4xl mx-auto px-5 sm:px-8 py-6">
         <div className="mb-5 space-y-3">
