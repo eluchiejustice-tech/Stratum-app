@@ -32,7 +32,7 @@ function VerificationStatusBadge({ status }) {
   );
 }
 
-export default function SellerProfilePage({ sellerId, onBack }) {
+export default function SellerProfilePage({ sellerId, onBack, onListingClick }) {
   const [profile, setProfile] = useState(null);
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -180,7 +180,12 @@ export default function SellerProfilePage({ sellerId, onBack }) {
               )}
 
               {cardListings.map((l) => (
-                <ListingCard key={l.id} listing={l} isAdmin={false} />
+                <ListingCard
+                  key={l.id}
+                  listing={l}
+                  isAdmin={false}
+                  onListingClick={onListingClick}
+                />
               ))}
             </div>
           </>
