@@ -3,10 +3,18 @@ import CoreSample from "./CoreSample";
 import VerifiedBadge from "./VerifiedBadge";
 import { contactHref } from "../utils/contactHref";
 
-export default function ListingCard({ listing, isAdmin, onVerify, onReject, onSellerClick }) {
+export default function ListingCard({
+  listing,
+  isAdmin,
+  onVerify,
+  onReject,
+  onSellerClick,
+  onListingClick,
+}) {
   const l = listing;
   const sellerLabel = l.company || l.seller;
   const canOpenSellerProfile = Boolean(onSellerClick && l.sellerId);
+  const canOpenListingDetail = Boolean(onListingClick && l.id);
 
   return (
     <div className="bg-white rounded-lg p-4 flex gap-4 shadow-sm border border-[#3D4148]/10">
@@ -14,7 +22,16 @@ export default function ListingCard({ listing, isAdmin, onVerify, onReject, onSe
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <div className="font-serif text-base leading-tight">{l.mineral}</div>
+            {canOpenListingDetail ? (
+              <button
+                onClick={() => onListingClick(l.id)}
+                className="font-serif text-base leading-tight text-left hover:text-[#1F4D3D] hover:underline transition"
+              >
+                {l.mineral}
+              </button>
+            ) : (
+              <div className="font-serif text-base leading-tight">{l.mineral}</div>
+            )}
             <div
               className="text-xs text-[#3D4148]/80 mt-0.5"
               style={{ fontFamily: "system-ui, sans-serif" }}
