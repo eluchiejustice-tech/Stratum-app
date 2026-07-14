@@ -5,7 +5,8 @@ import FilterChips from "../components/FilterChips";
 import ListingCard from "../components/ListingCard";
 import ConsultingBanner from "../components/ConsultingBanner";
 import AddListingModal from "../components/AddListingModal";
-import { MINERAL_COLORS, bandsFor } from "../utils/mineralColors";
+import { MINERAL_COLORS } from "../utils/mineralColors";
+import { mapListingRow } from "../utils/mapListingRow";
 import { useAuthContext } from "../context/AuthContext";
 import { useListings } from "../hooks/useListings";
 import {
@@ -32,25 +33,10 @@ export default function MarketplacePage({ onSellerClick }) {
 
   const { listings, loading, error, refresh } = useListings();
 
-  // Map DB rows into the shape ListingCard already expects,
-  // so ListingCard.jsx itself needs no changes.
-  const cardListings = listings.map((row) => ({
-    id: row.id,
-    sellerId: row.seller_id,
-    mineral: row.mineral,
-    grade: row.mineral_grade,
-    quantity: row.quantity,
-    location: [row.location, row.local_government_area, row.state, row.country]
-      .filter(Boolean)
-      .join(", "),
-    seller: row.seller_name,
-    company: row.seller_company,
-    contact: row.seller_contact,
-    verified: row.status === "verified",
-    price: row.price,
-    photoUrl: row.photo_url,
-    strata: bandsFor(row.mineral),
-  }));
+  // Map DB rows into the shape ListingCard already expects.
+  // Mapping logic now lives in utils/mapListingRow.js, shared with
+  // SellerProfilePage.jsx.
+  const cardListings = listings.map(mapListingRow);
 
   const addListing = async (form) => {
     const payload = {
