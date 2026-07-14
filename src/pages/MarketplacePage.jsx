@@ -23,7 +23,7 @@ import {
 // of this file rather than reconstructing it from memory.
 // ============================================================
 
-export default function MarketplacePage({ onSellerClick }) {
+export default function MarketplacePage({ onSellerClick, onListingClick }) {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -148,6 +148,7 @@ export default function MarketplacePage({ onSellerClick }) {
                 onVerify={verifyListing}
                 onReject={rejectListing}
                 onSellerClick={onSellerClick}
+                onListingClick={onListingClick}
               />
             ))}
         </div>
