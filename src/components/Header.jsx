@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Layers, Plus, Lock, Unlock, LogOut, UserCog } from "lucide-react";
+import { Layers, Plus, Lock, Unlock, LogOut, UserCog, ClipboardList } from "lucide-react";
 import { useAuthContext } from "../context/AuthContext";
 import { signOut } from "../services/auth";
 import LoginForm from "./LoginForm";
 import EditProfileModal from "./EditProfileModal";
 
-export default function Header({ onAddListing }) {
+export default function Header({ onAddListing, onMyListings }) {
   const { user, profile, role, loading, refreshProfile } = useAuthContext();
   const [showLogin, setShowLogin] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -39,6 +39,17 @@ export default function Header({ onAddListing }) {
                 <Unlock size={14} />
                 Moderator
               </div>
+            )}
+
+            {!loading && user && (
+              <button
+                onClick={onMyListings}
+                title="My listings"
+                className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-wide px-3 py-2 rounded bg-transparent text-[#EDE8DC]/70 border border-[#EDE8DC]/30 hover:brightness-110 transition"
+              >
+                <ClipboardList size={14} />
+                My listings
+              </button>
             )}
 
             {!loading && user && (
