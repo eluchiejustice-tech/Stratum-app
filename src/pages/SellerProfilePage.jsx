@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, MapPin, MessageCircle, ShieldCheck } from "lucide-react";
 import ListingCard from "../components/ListingCard";
-import { bandsFor } from "../utils/mineralColors";
+import { mapListingRow } from "../utils/mapListingRow";
 import { contactHref } from "../utils/contactHref";
 import { getProfileById, getApprovedListingsBySeller } from "../services/profiles";
 
@@ -74,22 +74,9 @@ export default function SellerProfilePage({ sellerId, onBack }) {
     };
   }, [sellerId]);
 
-  const cardListings = listings.map((row) => ({
-    id: row.id,
-    mineral: row.mineral,
-    grade: row.mineral_grade,
-    quantity: row.quantity,
-    location: [row.location, row.local_government_area, row.state, row.country]
-      .filter(Boolean)
-      .join(", "),
-    seller: row.seller_name,
-    company: row.seller_company,
-    contact: row.seller_contact,
-    verified: row.status === "verified",
-    price: row.price,
-    photoUrl: row.photo_url,
-    strata: bandsFor(row.mineral),
-  }));
+  // Mapping logic now lives in utils/mapListingRow.js, shared with
+  // MarketplacePage.jsx.
+  const cardListings = listings.map(mapListingRow);
 
   return (
     <div
