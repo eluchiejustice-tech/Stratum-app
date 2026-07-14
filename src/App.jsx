@@ -2,6 +2,7 @@ import { useState } from "react";
 import MarketplacePage from "./pages/MarketplacePage";
 import SellerProfilePage from "./pages/SellerProfilePage";
 import ListingDetailPage from "./pages/ListingDetailPage";
+import MyListingsPage from "./pages/MyListingsPage";
 import { AuthProvider } from "./context/AuthContext";
 
 // This file intentionally stays thin. All marketplace logic still lives in
@@ -11,7 +12,7 @@ import { AuthProvider } from "./context/AuthContext";
 // page is shown; "selectedSellerId" / "selectedListingId" carry whichever
 // entity the current detail view needs.
 export default function App() {
-  const [view, setView] = useState("marketplace"); // "marketplace" | "sellerProfile" | "listingDetail"
+  const [view, setView] = useState("marketplace"); // "marketplace" | "sellerProfile" | "listingDetail" | "myListings"
   const [selectedSellerId, setSelectedSellerId] = useState(null);
   const [selectedListingId, setSelectedListingId] = useState(null);
 
@@ -23,6 +24,10 @@ export default function App() {
   const openListingDetail = (listingId) => {
     setSelectedListingId(listingId);
     setView("listingDetail");
+  };
+
+  const openMyListings = () => {
+    setView("myListings");
   };
 
   const backToMarketplace = () => {
@@ -45,10 +50,17 @@ export default function App() {
           onBack={backToMarketplace}
           onSellerClick={openSellerProfile}
         />
+      ) : view === "myListings" ? (
+        <MyListingsPage
+          onBack={backToMarketplace}
+          onListingClick={openListingDetail}
+          onSellerClick={openSellerProfile}
+        />
       ) : (
         <MarketplacePage
           onSellerClick={openSellerProfile}
           onListingClick={openListingDetail}
+          onMyListings={openMyListings}
         />
       )}
     </AuthProvider>
