@@ -12,8 +12,6 @@ const PRICE_PHRASES = [
   "price on request",
 ];
 
-// Loose, intentionally permissive — a light nudge, not a hard gate.
-// Matches things like "$1,150/tonne", "1150", "₦50,000", "1,150 / kg".
 const PRICE_PATTERN = /^[$₦€£]?\s?[\d,]+(\.\d+)?(\s?\/\s?\w+)?$/;
 
 const PHONE_PATTERN = /^[+\d][\d\s\-()]{6,19}$/;
@@ -66,11 +64,14 @@ export default function AddListingModal({ onClose, onAdd }) {
     contact: "",
     price: "",
     photoUrl: "",
+    documentUrl: "",
   });
   const [errors, setErrors] = useState({});
   const [priceWarning, setPriceWarning] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [docUploadError, setDocUploadError] = useState("");
 
   const updateField = (field, value) => {
     setForm((f) => ({ ...f, [field]: value }));
@@ -110,12 +111,38 @@ export default function AddListingModal({ onClose, onAdd }) {
     setUploading(false);
   };
 
+  const handleDocumentChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingDoc(true);
+    setDocUploadError("");
+
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+
+    const { error: uploadErr } = await supabase.storage
+      .from("listing-documents")
+      .upload(fileName, file);
+
+    if (uploadErr) {
+      console.error("Document upload failed", uploadErr);
+      setDocUploadError("Upload failed. Please try a PDF, JPG, or PNG under 10MB.");
+      setUploadingDoc(false);
+      return;
+    }
+
+    const { data } = supabase.storage.from("listing-documents").getPublicUrl(fileName);
+    setForm((f) => ({ ...f, documentUrl: data.publicUrl }));
+    setUploadingDoc(false);
+  };
+
   const submit = () => {
     const validationErrors = validate(form);
     setErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) return;
-    if (uploading) return;
+    if (uploading || uploadingDoc) return;
 
     const quantity = `${form.quantityAmount.trim()} ${form.quantityUnit}`;
 
@@ -131,6 +158,7 @@ export default function AddListingModal({ onClose, onAdd }) {
       contact: form.contact.trim(),
       price: form.price.trim(),
       photoUrl: form.photoUrl,
+      documentUrl: form.documentUrl,
     });
     onClose();
   };
@@ -308,13 +336,37 @@ export default function AddListingModal({ onClose, onAdd }) {
               <p className="text-[10px] text-[#1F4D3D] mt-1">Photo attached ✓</p>
             )}
           </div>
+
+          <div>
+            <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">
+              Assay report / certificate (optional)
+            </label>
+            <input
+              type="file"
+              accept="application/pdf,image/jpeg,image/png,image/webp"
+              onChange={handleDocumentChange}
+              className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
+            />
+            <p className="text-[10px] text-[#3D4148]/50 mt-1">
+              PDF, JPG, or PNG, up to 10MB. Boosts buyer trust in your listing.
+            </p>
+            {uploadingDoc && (
+              <p className="text-[10px] text-[#3D4148]/60 mt-1">Uploading document…</p>
+            )}
+            {docUploadError && (
+              <p className="text-[10px] text-[#8a3b3b] mt-1">{docUploadError}</p>
+            )}
+            {form.documentUrl && !uploadingDoc && (
+              <p className="text-[10px] text-[#1F4D3D] mt-1">Document attached ✓</p>
+            )}
+          </div>
         </div>
         <button
           onClick={submit}
-          disabled={uploading}
+          disabled={uploading || uploadingDoc}
           className="w-full mt-5 bg-[#15130F] text-[#EDE8DC] font-mono text-sm uppercase tracking-wide py-3 rounded hover:bg-[#3D4148] transition disabled:opacity-50"
         >
-          {uploading ? "Uploading…" : "Submit for review"}
+          {uploading || uploadingDoc ? "Uploading…" : "Submit for review"}
         </button>
         <p className="text-xs text-[#3D4148]/70 mt-2 text-center">
           New listings show as "Pending review" until your team verifies them.
