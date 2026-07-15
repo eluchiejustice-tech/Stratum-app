@@ -4,6 +4,7 @@ import { MINERAL_COLORS } from "../utils/mineralColors";
 import { supabase } from "../services/supabaseClient";
 
 const QUANTITY_UNITS = ["kg", "g", "tonnes", "tons", "lb", "oz"];
+const MAX_PHOTOS = 5;
 
 const PRICE_PHRASES = [
   "negotiable",
@@ -17,7 +18,7 @@ const PRICE_PATTERN = /^[$₦€£]?\s?[\d,]+(\.\d+)?(\s?\/\s?\w+)?$/;
 const PHONE_PATTERN = /^[+\d][\d\s\-()]{6,19}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function validate(form) {
+function validate(form, photos) {
   const errors = {};
 
   if (!form.grade.trim()) errors.grade = "Grade / spec is required.";
@@ -37,6 +38,10 @@ function validate(form) {
     errors.contact = "Contact is required.";
   } else if (!PHONE_PATTERN.test(contact) && !EMAIL_PATTERN.test(contact)) {
     errors.contact = "Enter a valid phone number or email address.";
+  }
+
+  if (photos.length === 0) {
+    errors.photos = "At least one photo is required.";
   }
 
   return errors;
@@ -63,13 +68,12 @@ export default function AddListingModal({ onClose, onAdd }) {
     company: "",
     contact: "",
     price: "",
-    photoUrl: "",
     documentUrl: "",
   });
+  const [photos, setPhotos] = useState([]);
+  const [photoError, setPhotoError] = useState("");
   const [errors, setErrors] = useState({});
   const [priceWarning, setPriceWarning] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState("");
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docUploadError, setDocUploadError] = useState("");
 
@@ -85,30 +89,72 @@ export default function AddListingModal({ onClose, onAdd }) {
     setPriceWarning(getPriceWarning(value));
   };
 
-  const handleFileChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploading(true);
-    setUploadError("");
-
+  const uploadPhoto = async (file, position) => {
     const fileExt = file.name.split(".").pop();
-    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+    const storagePath = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+
+    setPhotos((prev) => [
+      ...prev,
+      { id: storagePath, url: null, storagePath, position, uploading: true },
+    ]);
 
     const { error: uploadErr } = await supabase.storage
       .from("listing-photos")
-      .upload(fileName, file);
+      .upload(storagePath, file);
 
     if (uploadErr) {
       console.error("Photo upload failed", uploadErr);
-      setUploadError("Upload failed. Please try again.");
-      setUploading(false);
+      setPhotos((prev) => prev.filter((p) => p.id !== storagePath));
+      setPhotoError("One of your photos failed to upload. Please try again.");
       return;
     }
 
-    const { data } = supabase.storage.from("listing-photos").getPublicUrl(fileName);
-    setForm((f) => ({ ...f, photoUrl: data.publicUrl }));
-    setUploading(false);
+    const { data } = supabase.storage.from("listing-photos").getPublicUrl(storagePath);
+    setPhotos((prev) =>
+      prev.map((p) => (p.id === storagePath ? { ...p, url: data.publicUrl, uploading: false } : p))
+    );
+  };
+
+  const handlePhotosChange = (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (files.length === 0) return;
+
+    const availableSlots = MAX_PHOTOS - photos.length;
+
+    if (availableSlots <= 0) {
+      setPhotoError(`You can upload up to ${MAX_PHOTOS} photos. Remove one to add another.`);
+      return;
+    }
+
+    const filesToUpload = files.slice(0, availableSlots);
+
+    if (files.length > availableSlots) {
+      setPhotoError(
+        `Only ${availableSlots} more photo${availableSlots === 1 ? "" : "s"} can be added (max ${MAX_PHOTOS} total). The rest were skipped.`
+      );
+    } else {
+      setPhotoError("");
+    }
+
+    if (errors.photos) {
+      setErrors((e) => ({ ...e, photos: undefined }));
+    }
+
+    let nextPosition = photos.length;
+    filesToUpload.forEach((file) => {
+      uploadPhoto(file, nextPosition);
+      nextPosition += 1;
+    });
+  };
+
+  const removePhoto = (id) => {
+    setPhotos((prev) =>
+      prev
+        .filter((p) => p.id !== id)
+        .map((p, idx) => ({ ...p, position: idx }))
+    );
+    setPhotoError("");
   };
 
   const handleDocumentChange = async (e) => {
@@ -137,12 +183,14 @@ export default function AddListingModal({ onClose, onAdd }) {
     setUploadingDoc(false);
   };
 
+  const anyPhotoUploading = photos.some((p) => p.uploading);
+
   const submit = () => {
-    const validationErrors = validate(form);
+    const validationErrors = validate(form, photos);
     setErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) return;
-    if (uploading || uploadingDoc) return;
+    if (anyPhotoUploading || uploadingDoc) return;
 
     const quantity = `${form.quantityAmount.trim()} ${form.quantityUnit}`;
 
@@ -157,8 +205,11 @@ export default function AddListingModal({ onClose, onAdd }) {
       company: form.company.trim(),
       contact: form.contact.trim(),
       price: form.price.trim(),
-      photoUrl: form.photoUrl,
       documentUrl: form.documentUrl,
+      photos: photos
+        .slice()
+        .sort((a, b) => a.position - b.position)
+        .map((p) => ({ url: p.url, storagePath: p.storagePath, position: p.position })),
     });
     onClose();
   };
@@ -318,22 +369,56 @@ export default function AddListingModal({ onClose, onAdd }) {
 
           <div>
             <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">
-              Mineral photo (optional)
+              Mineral photos (up to {MAX_PHOTOS}, first one is the cover photo)
             </label>
             <input
               type="file"
               accept="image/*"
-              onChange={handleFileChange}
-              className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
+              multiple
+              onChange={handlePhotosChange}
+              disabled={photos.length >= MAX_PHOTOS}
+              className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm disabled:opacity-50"
             />
-            {uploading && (
-              <p className="text-[10px] text-[#3D4148]/60 mt-1">Uploading photo…</p>
-            )}
-            {uploadError && (
-              <p className="text-[10px] text-[#8a3b3b] mt-1">{uploadError}</p>
-            )}
-            {form.photoUrl && !uploading && (
-              <p className="text-[10px] text-[#1F4D3D] mt-1">Photo attached ✓</p>
+            {errors.photos && <p className="text-[10px] text-[#8a3b3b] mt-1">{errors.photos}</p>}
+            {photoError && <p className="text-[10px] text-[#9c7a1f] mt-1">{photoError}</p>}
+
+            {photos.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {photos
+                  .slice()
+                  .sort((a, b) => a.position - b.position)
+                  .map((p, idx) => (
+                    <div
+                      key={p.id}
+                      className="relative w-16 h-16 rounded border border-[#3D4148]/20 overflow-hidden bg-white flex items-center justify-center"
+                    >
+                      {p.uploading ? (
+                        <span className="text-[9px] text-[#3D4148]/60 text-center px-1">
+                          Uploading…
+                        </span>
+                      ) : (
+                        <img
+                          src={p.url}
+                          alt={`Photo ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                      {idx === 0 && !p.uploading && (
+                        <span className="absolute top-0 left-0 bg-[#1F4D3D] text-[#EDE8DC] text-[8px] font-mono uppercase px-1 py-0.5">
+                          Cover
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(p.id)}
+                        title="Remove photo"
+                        className="absolute top-0 right-0 bg-[#8a3b3b] text-[#EDE8DC] rounded-bl w-4 h-4 flex items-center justify-center text-[10px] leading-none"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ))}
+              </div>
             )}
           </div>
 
@@ -363,10 +448,10 @@ export default function AddListingModal({ onClose, onAdd }) {
         </div>
         <button
           onClick={submit}
-          disabled={uploading || uploadingDoc}
+          disabled={anyPhotoUploading || uploadingDoc}
           className="w-full mt-5 bg-[#15130F] text-[#EDE8DC] font-mono text-sm uppercase tracking-wide py-3 rounded hover:bg-[#3D4148] transition disabled:opacity-50"
         >
-          {uploading || uploadingDoc ? "Uploading…" : "Submit for review"}
+          {anyPhotoUploading || uploadingDoc ? "Uploading…" : "Submit for review"}
         </button>
         <p className="text-xs text-[#3D4148]/70 mt-2 text-center">
           New listings show as "Pending review" until your team verifies them.
