@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, MapPin, MessageCircle, FileText } from "lucide-react";
 import CoreSample from "../components/CoreSample";
 import VerifiedBadge from "../components/VerifiedBadge";
@@ -6,6 +6,7 @@ import { contactHref } from "../utils/contactHref";
 import { mapListingRow } from "../utils/mapListingRow";
 import {
   getListingById,
+  getPhotosByListing,
   updateListingStatus,
   createVerificationRecord,
 } from "../services/listings";
@@ -18,6 +19,10 @@ export default function ListingDetailPage({ listingId, onBack, onSellerClick }) 
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const [photos, setPhotos] = useState([]);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const touchStartX = useRef(null);
 
   const loadListing = useCallback(async () => {
     if (!listingId) return;
@@ -35,6 +40,16 @@ export default function ListingDetailPage({ listingId, onBack, onSellerClick }) 
     }
 
     setListing(mapListingRow(data));
+
+    const { data: photoRows, error: photosError } = await getPhotosByListing(listingId);
+    if (photosError) {
+      console.error("Failed to load listing photos", photosError);
+      setPhotos([]);
+    } else {
+      setPhotos(photoRows || []);
+    }
+    setActiveIndex(0);
+
     setLoading(false);
   }, [listingId]);
 
@@ -83,6 +98,31 @@ export default function ListingDetailPage({ listingId, onBack, onSellerClick }) 
 
   const canOpenSellerProfile = Boolean(onSellerClick && listing?.sellerId);
 
+  // Prefer the real gallery; fall back to the legacy single photo_url for
+  // listings created before the listing_photos table existed.
+  const galleryUrls =
+    photos.length > 0
+      ? photos.map((p) => p.photo_url)
+      : listing?.photoUrl
+      ? [listing.photoUrl]
+      : [];
+
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (touchStartX.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    const threshold = 40;
+    if (deltaX > threshold) {
+      setActiveIndex((i) => Math.max(0, i - 1));
+    } else if (deltaX < -threshold) {
+      setActiveIndex((i) => Math.min(galleryUrls.length - 1, i + 1));
+    }
+    touchStartX.current = null;
+  };
+
   return (
     <div
       className="min-h-screen bg-[#EDE8DC] text-[#15130F]"
@@ -123,15 +163,46 @@ export default function ListingDetailPage({ listingId, onBack, onSellerClick }) 
             </div>
 
             <div className="flex gap-5 flex-wrap sm:flex-nowrap">
-              <div className="shrink-0">
-                {listing.photoUrl ? (
-                  <a href={listing.photoUrl} target="_blank" rel="noopener noreferrer">
-                    <img
-                      src={listing.photoUrl}
-                      alt={listing.mineral}
-                      className="w-full sm:w-56 h-56 object-cover rounded-lg border border-[#3D4148]/10"
-                    />
-                  </a>
+              <div className="shrink-0 w-full sm:w-56">
+                {galleryUrls.length > 0 ? (
+                  <>
+                    <a
+                      href={galleryUrls[activeIndex]}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onTouchStart={handleTouchStart}
+                      onTouchEnd={handleTouchEnd}
+                    >
+                      <img
+                        src={galleryUrls[activeIndex]}
+                        alt={`${listing.mineral} photo ${activeIndex + 1}`}
+                        className="w-full sm:w-56 h-56 object-cover rounded-lg border border-[#3D4148]/10"
+                      />
+                    </a>
+
+                    {galleryUrls.length > 1 && (
+                      <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
+                        {galleryUrls.map((url, idx) => (
+                          <button
+                            key={`${url}-${idx}`}
+                            type="button"
+                            onClick={() => setActiveIndex(idx)}
+                            className={`shrink-0 w-12 h-12 rounded overflow-hidden border-2 transition ${
+                              idx === activeIndex
+                                ? "border-[#1F4D3D]"
+                                : "border-transparent opacity-70 hover:opacity-100"
+                            }`}
+                          >
+                            <img
+                              src={url}
+                              alt={`Thumbnail ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="w-full sm:w-56 h-56 flex items-center justify-center">
                     <CoreSample bands={listing.strata} />
