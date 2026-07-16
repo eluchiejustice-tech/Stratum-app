@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, MapPin, MessageCircle, FileText } from "lucide-react";
+import { ArrowLeft, MapPin, MessageCircle, FileText, X, ChevronLeft, ChevronRight } from "lucide-react";
 import CoreSample from "../components/CoreSample";
 import VerifiedBadge from "../components/VerifiedBadge";
 import { contactHref } from "../utils/contactHref";
@@ -22,6 +22,7 @@ export default function ListingDetailPage({ listingId, onBack, onSellerClick }) 
 
   const [photos, setPhotos] = useState([]);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const touchStartX = useRef(null);
 
   const loadListing = useCallback(async () => {
@@ -123,6 +124,9 @@ export default function ListingDetailPage({ listingId, onBack, onSellerClick }) 
     touchStartX.current = null;
   };
 
+  const showPrev = () => setActiveIndex((i) => Math.max(0, i - 1));
+  const showNext = () => setActiveIndex((i) => Math.min(galleryUrls.length - 1, i + 1));
+
   return (
     <div
       className="min-h-screen bg-[#EDE8DC] text-[#15130F]"
@@ -166,19 +170,19 @@ export default function ListingDetailPage({ listingId, onBack, onSellerClick }) 
               <div className="shrink-0 w-full sm:w-56">
                 {galleryUrls.length > 0 ? (
                   <>
-                    <a
-                      href={galleryUrls[activeIndex]}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => setLightboxOpen(true)}
                       onTouchStart={handleTouchStart}
                       onTouchEnd={handleTouchEnd}
+                      className="block w-full"
                     >
                       <img
                         src={galleryUrls[activeIndex]}
                         alt={`${listing.mineral} photo ${activeIndex + 1}`}
                         className="w-full sm:w-56 h-56 object-cover rounded-lg border border-[#3D4148]/10"
                       />
-                    </a>
+                    </button>
 
                     {galleryUrls.length > 1 && (
                       <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
@@ -318,6 +322,57 @@ export default function ListingDetailPage({ listingId, onBack, onSellerClick }) 
           </div>
         )}
       </div>
+
+      {lightboxOpen && galleryUrls.length > 0 && (
+        <div
+          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          <button
+            type="button"
+            onClick={() => setLightboxOpen(false)}
+            className="absolute top-4 right-4 text-white/80 hover:text-white p-2"
+            aria-label="Close"
+          >
+            <X size={28} />
+          </button>
+
+          {galleryUrls.length > 1 && (
+            <div className="absolute top-4 left-4 text-white/70 text-sm font-mono">
+              {activeIndex + 1} / {galleryUrls.length}
+            </div>
+          )}
+
+          {galleryUrls.length > 1 && activeIndex > 0 && (
+            <button
+              type="button"
+              onClick={showPrev}
+              className="absolute left-2 sm:left-6 text-white/80 hover:text-white p-2"
+              aria-label="Previous photo"
+            >
+              <ChevronLeft size={36} />
+            </button>
+          )}
+
+          <img
+            src={galleryUrls[activeIndex]}
+            alt={`${listing?.mineral || "Listing"} photo ${activeIndex + 1}`}
+            className="max-w-[92vw] max-h-[80vh] object-contain"
+          />
+
+          {galleryUrls.length > 1 && activeIndex < galleryUrls.length - 1 && (
+            <button
+              type="button"
+              onClick={showNext}
+              className="absolute right-2 sm:right-6 text-white/80 hover:text-white p-2"
+              aria-label="Next photo"
+            >
+              <ChevronRight size={36} />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
