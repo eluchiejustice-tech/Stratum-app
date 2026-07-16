@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X } from "lucide-react";
+import { X, Eye, EyeOff } from "lucide-react";
 import { signIn, signUp } from "../services/auth";
 import RoleSelect from "./RoleSelect";
 
@@ -11,6 +11,7 @@ export default function LoginForm({ onClose, onSuccess }) {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   // Signup state
   const [signupName, setSignupName] = useState("");
@@ -21,6 +22,8 @@ export default function LoginForm({ onClose, onSuccess }) {
   const [signupError, setSignupError] = useState("");
   const [signupLoading, setSignupLoading] = useState(false);
   const [signupSuccess, setSignupSuccess] = useState(false);
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [showSignupConfirm, setShowSignupConfirm] = useState(false);
 
   const handleLogin = async () => {
     setLoginError("");
@@ -92,17 +95,27 @@ export default function LoginForm({ onClose, onSuccess }) {
               autoFocus
             />
 
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setLoginError("");
-              }}
-              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              placeholder="Password"
-              className="w-full bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
-            />
+            <div className="relative">
+              <input
+                type={showLoginPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setLoginError("");
+                }}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                placeholder="Password"
+                className="w-full bg-white border border-[#3D4148]/20 rounded px-3 py-2 pr-9 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => setShowLoginPassword((v) => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#3D4148]/60 hover:text-[#15130F]"
+                aria-label={showLoginPassword ? "Hide password" : "Show password"}
+              >
+                {showLoginPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
 
             {loginError && (
               <p className="text-xs text-[#8a3b3b] mt-2 font-mono">{loginError}</p>
@@ -147,21 +160,41 @@ export default function LoginForm({ onClose, onSuccess }) {
               className="w-full bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm mb-2"
             />
 
-            <input
-              type="password"
-              value={signupPassword}
-              onChange={(e) => setSignupPassword(e.target.value)}
-              placeholder="Password"
-              className="w-full bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm mb-2"
-            />
+            <div className="relative mb-2">
+              <input
+                type={showSignupPassword ? "text" : "password"}
+                value={signupPassword}
+                onChange={(e) => setSignupPassword(e.target.value)}
+                placeholder="Password"
+                className="w-full bg-white border border-[#3D4148]/20 rounded px-3 py-2 pr-9 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => setShowSignupPassword((v) => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#3D4148]/60 hover:text-[#15130F]"
+                aria-label={showSignupPassword ? "Hide password" : "Show password"}
+              >
+                {showSignupPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
 
-            <input
-              type="password"
-              value={signupConfirm}
-              onChange={(e) => setSignupConfirm(e.target.value)}
-              placeholder="Confirm password"
-              className="w-full bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm mb-2"
-            />
+            <div className="relative mb-2">
+              <input
+                type={showSignupConfirm ? "text" : "password"}
+                value={signupConfirm}
+                onChange={(e) => setSignupConfirm(e.target.value)}
+                placeholder="Confirm password"
+                className="w-full bg-white border border-[#3D4148]/20 rounded px-3 py-2 pr-9 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => setShowSignupConfirm((v) => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#3D4148]/60 hover:text-[#15130F]"
+                aria-label={showSignupConfirm ? "Hide password" : "Show password"}
+              >
+                {showSignupConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
 
             <div className="mb-2">
               <RoleSelect value={signupRole} onChange={setSignupRole} />
