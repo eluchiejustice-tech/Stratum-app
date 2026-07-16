@@ -380,7 +380,11 @@ export default function AddListingModal({ onClose, onAdd }) {
               className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm disabled:opacity-50"
             />
             {errors.photos && <p className="text-[10px] text-[#8a3b3b] mt-1">{errors.photos}</p>}
-            {photoError && <p className="text-[10px] text-[#9c7a1f] mt-1">{photoError}</p>}
+            {photoError && (
+              <p className="text-sm font-medium text-[#8a3b3b] bg-[#8a3b3b]/10 border border-[#8a3b3b]/30 rounded px-3 py-2 mt-2">
+                {photoError}
+              </p>
+            )}
 
             {photos.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
