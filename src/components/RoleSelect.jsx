@@ -6,6 +6,7 @@ const SELF_SERVICE_ROLES = [
   { value: "miner_supplier", label: "Miner / Supplier" },
   { value: "professional", label: "Geologist / Professional" },
   { value: "company", label: "Mining Company" },
+  { value: "mineral_agent", label: "Mineral Agent" },
 ];
 
 export default function RoleSelect({ value, onChange }) {
