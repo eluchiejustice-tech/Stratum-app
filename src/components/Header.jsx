@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Layers, Plus, Lock, Unlock, LogOut, UserCog, ClipboardList } from "lucide-react";
+import { Layers, Plus, Lock, Shield, LogOut, UserCog, ClipboardList } from "lucide-react";
 import { useAuthContext } from "../context/AuthContext";
 import { signOut } from "../services/auth";
 import LoginForm from "./LoginForm";
@@ -19,7 +19,7 @@ export default function Header({ onAddListing, onMyListings }) {
   return (
     <>
       <header className="bg-[#15130F] text-[#EDE8DC] px-5 py-5 sm:px-8">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
+        <div className="max-w-4xl mx-auto flex items-center justify-between flex-wrap gap-y-3">
           <div className="flex items-center gap-2">
             <Layers size={22} className="text-[#B8922F]" strokeWidth={1.5} />
             <div>
@@ -30,14 +30,13 @@ export default function Header({ onAddListing, onMyListings }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             {isModerator && (
               <div
                 title="Moderator"
-                className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-wide px-3 py-2 rounded bg-[#1F4D3D] text-[#EDE8DC]"
+                className="flex items-center justify-center w-8 h-8 rounded-full bg-[#1F4D3D] text-[#EDE8DC] shrink-0"
               >
-                <Unlock size={14} />
-                Moderator
+                <Shield size={14} />
               </div>
             )}
 
@@ -66,11 +65,11 @@ export default function Header({ onAddListing, onMyListings }) {
             {!loading && user && (
               <button
                 onClick={handleLogout}
-                title="Log out"
+                title={profile?.name ? `Log out (${profile.name})` : "Log out"}
                 className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-wide px-3 py-2 rounded bg-transparent text-[#EDE8DC]/70 border border-[#EDE8DC]/30 hover:brightness-110 transition"
               >
                 <LogOut size={14} />
-                {profile?.name || "Log out"}
+                Log out
               </button>
             )}
 
