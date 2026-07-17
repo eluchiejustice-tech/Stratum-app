@@ -3,6 +3,8 @@ import { X, Eye, EyeOff } from "lucide-react";
 import { signIn, signUp } from "../services/auth";
 import RoleSelect from "./RoleSelect";
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function LoginForm({ onClose, onSuccess }) {
   const [mode, setMode] = useState("login"); // "login" | "signup"
 
@@ -24,6 +26,7 @@ export default function LoginForm({ onClose, onSuccess }) {
   const [signupSuccess, setSignupSuccess] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showSignupConfirm, setShowSignupConfirm] = useState(false);
+  const [signupBlockedExisting, setSignupBlockedExisting] = useState(false);
 
   const handleLogin = async () => {
     setLoginError("");
@@ -46,7 +49,14 @@ export default function LoginForm({ onClose, onSuccess }) {
 
   const handleSignup = async () => {
     setSignupError("");
+    setSignupBlockedExisting(false);
 
+    const trimmedEmail = signupEmail.trim();
+
+    if (!EMAIL_PATTERN.test(trimmedEmail)) {
+      setSignupError("Enter a valid email address.");
+      return;
+    }
     if (signupPassword !== signupConfirm) {
       setSignupError("Passwords do not match.");
       return;
@@ -57,11 +67,28 @@ export default function LoginForm({ onClose, onSuccess }) {
     }
 
     setSignupLoading(true);
-    const { data, error } = await signUp(signupEmail, signupPassword, signupName, signupRole);
+    const { data, error } = await signUp(
+      trimmedEmail,
+      signupPassword,
+      signupName,
+      signupRole
+    );
     setSignupLoading(false);
 
     if (error) {
       setSignupError(error.message);
+      return;
+    }
+
+    const alreadyRegistered =
+      Array.isArray(data?.user?.identities) &&
+      data.user.identities.length === 0;
+
+    if (alreadyRegistered) {
+      setSignupError(
+        "We couldn't create a new account with this email. If you've registered before, please sign in instead. If you're unsure, you'll be able to reset your password once that feature is available."
+      );
+      setSignupBlockedExisting(true);
       return;
     }
 
@@ -202,6 +229,15 @@ export default function LoginForm({ onClose, onSuccess }) {
 
             {signupError && (
               <p className="text-xs text-[#8a3b3b] mt-1 font-mono">{signupError}</p>
+            )}
+
+            {signupBlockedExisting && (
+              <button
+                onClick={() => setMode("login")}
+                className="text-xs underline text-[#3D4148] hover:text-[#15130F] mt-1"
+              >
+                Go to login
+              </button>
             )}
 
             <button
