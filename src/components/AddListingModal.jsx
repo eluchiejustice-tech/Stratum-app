@@ -2,6 +2,7 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { MINERAL_COLORS } from "../utils/mineralColors";
 import { supabase } from "../services/supabaseClient";
+import { AFRICA_LOCATIONS } from "../data/africaLocations";
 
 const QUANTITY_UNITS = ["kg", "g", "tonnes", "tons", "lb", "oz"];
 const MAX_PHOTOS = 5;
@@ -76,6 +77,15 @@ export default function AddListingModal({ onClose, onAdd }) {
   const [priceWarning, setPriceWarning] = useState(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docUploadError, setDocUploadError] = useState("");
+
+  // Derived from the verified geographic dataset. `states` is always in
+  // sync with AFRICA_LOCATIONS.Nigeria; `lgas` is empty until a state is
+  // selected, then holds that state's verified { name, headquarters,
+  // aliases } objects. Only `.name` is ever stored on the form — aliases
+  // are not written anywhere here, and remain available later purely for
+  // search matching elsewhere in the app.
+  const states = Object.keys(AFRICA_LOCATIONS.Nigeria);
+  const lgas = form.state ? AFRICA_LOCATIONS.Nigeria[form.state].lgas : [];
 
   const updateField = (field, value) => {
     setForm((f) => ({ ...f, [field]: value }));
@@ -283,14 +293,23 @@ export default function AddListingModal({ onClose, onAdd }) {
 
           <div>
             <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">State</label>
-            <input
+            <select
               value={form.state}
-              onChange={(e) => updateField("state", e.target.value)}
-              placeholder="e.g. Ekiti, Nasarawa, Kaduna"
+              onChange={(e) => {
+                updateField("state", e.target.value);
+                updateField("lga", "");
+              }}
               className={`w-full mt-1 bg-white border rounded px-3 py-2 text-sm ${
                 errors.state ? "border-[#8a3b3b]" : "border-[#3D4148]/20"
               }`}
-            />
+            >
+              <option value="">Select State</option>
+              {states.map((state) => (
+                <option key={state} value={state}>
+                  {state}
+                </option>
+              ))}
+            </select>
             {errors.state && <p className="text-[10px] text-[#8a3b3b] mt-1">{errors.state}</p>}
           </div>
 
@@ -298,12 +317,19 @@ export default function AddListingModal({ onClose, onAdd }) {
             <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">
               Local Government Area (optional)
             </label>
-            <input
+            <select
               value={form.lga}
               onChange={(e) => updateField("lga", e.target.value)}
-              placeholder="e.g. Jos North, Ijero"
-              className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
-            />
+              disabled={!form.state}
+              className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm disabled:bg-gray-100 disabled:text-gray-400"
+            >
+              <option value="">{form.state ? "Select LGA" : "Select State First"}</option>
+              {lgas.map((lga) => (
+                <option key={lga.name} value={lga.name}>
+                  {lga.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
