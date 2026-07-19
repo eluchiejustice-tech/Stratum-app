@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, MapPin, MessageCircle, FileText, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, MapPin, MessageCircle, FileText, X, ChevronLeft, ChevronRight, ShieldCheck } from "lucide-react";
 import CoreSample from "../components/CoreSample";
 import VerifiedBadge from "../components/VerifiedBadge";
 import { contactHref } from "../utils/contactHref";
@@ -10,7 +10,19 @@ import {
   updateListingStatus,
   createVerificationRecord,
 } from "../services/listings";
+import { getProfileById, getApprovedListingsBySeller } from "../services/profiles";
 import { useAuthContext } from "../context/AuthContext";
+
+function formatDate(isoString) {
+  if (!isoString) return null;
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return null;
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
 
 export default function ListingDetailPage({ listingId, onBack, onSellerClick }) {
   const { user, role } = useAuthContext();
@@ -24,6 +36,9 @@ export default function ListingDetailPage({ listingId, onBack, onSellerClick }) 
   const [activeIndex, setActiveIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const touchStartX = useRef(null);
+
+  const [sellerProfile, setSellerProfile] = useState(null);
+  const [sellerListingCount, setSellerListingCount] = useState(null);
 
   const loadListing = useCallback(async () => {
     if (!listingId) return;
@@ -40,16 +55,50 @@ export default function ListingDetailPage({ listingId, onBack, onSellerClick }) 
       return;
     }
 
-    setListing(mapListingRow(data));
+    const mapped = mapListingRow(data);
+    setListing(mapped);
 
-    const { data: photoRows, error: photosError } = await getPhotosByListing(listingId);
-    if (photosError) {
-      console.error("Failed to load listing photos", photosError);
+    // Photos and seller data are independent of each other, so they're
+    // fetched concurrently rather than one after another. Seller calls are
+    // only included when sellerId exists; when it doesn't, those two
+    // resolve to a harmless { data: null, error: null } shape so
+    // Promise.all still works uniformly.
+    const [photosRes, profileRes, listingsRes] = await Promise.all([
+      getPhotosByListing(listingId),
+      mapped.sellerId
+        ? getProfileById(mapped.sellerId)
+        : Promise.resolve({ data: null, error: null }),
+      mapped.sellerId
+        ? getApprovedListingsBySeller(mapped.sellerId)
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+
+    if (photosRes.error) {
+      console.error("Failed to load listing photos", photosRes.error);
       setPhotos([]);
     } else {
-      setPhotos(photoRows || []);
+      setPhotos(photosRes.data || []);
     }
     setActiveIndex(0);
+
+    if (mapped.sellerId) {
+      if (profileRes.error) {
+        console.error("Failed to load seller profile", profileRes.error);
+        setSellerProfile(null);
+      } else {
+        setSellerProfile(profileRes.data);
+      }
+
+      if (listingsRes.error) {
+        console.error("Failed to load seller listing count", listingsRes.error);
+        setSellerListingCount(null);
+      } else {
+        setSellerListingCount((listingsRes.data || []).length);
+      }
+    } else {
+      setSellerProfile(null);
+      setSellerListingCount(null);
+    }
 
     setLoading(false);
   }, [listingId]);
@@ -126,6 +175,15 @@ export default function ListingDetailPage({ listingId, onBack, onSellerClick }) 
 
   const showPrev = () => setActiveIndex((i) => Math.max(0, i - 1));
   const showNext = () => setActiveIndex((i) => Math.min(galleryUrls.length - 1, i + 1));
+
+  const postedDate = listing ? formatDate(listing.createdAt) : null;
+  const sellerVerificationStatus = (sellerProfile?.verification_status || "unverified").toLowerCase();
+  const sellerVerificationLabel = {
+    verified: "Verified seller",
+    pending: "Verification pending",
+    rejected: "Verification rejected",
+    unverified: "Unverified seller",
+  }[sellerVerificationStatus] || "Unverified seller";
 
   return (
     <div
@@ -252,6 +310,24 @@ export default function ListingDetailPage({ listingId, onBack, onSellerClick }) 
                     </div>
                     <div className="text-sm font-mono text-[#1F4D3D]">{listing.price}</div>
                   </div>
+
+                  {postedDate && (
+                    <div>
+                      <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-1">
+                        Posted
+                      </div>
+                      <div className="text-sm font-mono">{postedDate}</div>
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-1">
+                      Listing status
+                    </div>
+                    <div className="text-sm font-mono">
+                      {listing.verified ? "Verified" : listing.statusRaw === "rejected" ? "Rejected" : "Pending review"}
+                    </div>
+                  </div>
                 </div>
 
                 {listing.documentUrl && (
@@ -267,7 +343,45 @@ export default function ListingDetailPage({ listingId, onBack, onSellerClick }) 
               </div>
             </div>
 
-            <div className="border-t border-[#3D4148]/10 mt-5 pt-4 flex items-center justify-between flex-wrap gap-3">
+            <div className="border-t border-[#3D4148]/10 mt-5 pt-4">
+              <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-2">
+                Seller trust summary
+              </div>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-[#3D4148]">
+                <span
+                  className={`inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wide px-2 py-1 rounded ${
+                    sellerVerificationStatus === "verified"
+                      ? "bg-[#1F4D3D]/10 text-[#1F4D3D]"
+                      : sellerVerificationStatus === "pending"
+                      ? "bg-[#9c7a1f]/10 text-[#9c7a1f]"
+                      : sellerVerificationStatus === "rejected"
+                      ? "bg-[#8a3b3b]/10 text-[#8a3b3b]"
+                      : "bg-[#3D4148]/10 text-[#3D4148]/70"
+                  }`}
+                  style={{ fontFamily: "system-ui, sans-serif" }}
+                >
+                  <ShieldCheck size={11} /> {sellerVerificationLabel}
+                </span>
+
+                {sellerProfile?.company && (
+                  <span style={{ fontFamily: "system-ui, sans-serif" }}>{sellerProfile.company}</span>
+                )}
+
+                {sellerProfile?.location && (
+                  <span className="flex items-center gap-1" style={{ fontFamily: "system-ui, sans-serif" }}>
+                    <MapPin size={11} /> {sellerProfile.location}
+                  </span>
+                )}
+
+                {sellerListingCount !== null && (
+                  <span style={{ fontFamily: "system-ui, sans-serif" }}>
+                    {sellerListingCount} active listing{sellerListingCount === 1 ? "" : "s"}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="border-t border-[#3D4148]/10 mt-4 pt-4 flex items-center justify-between flex-wrap gap-3">
               <div>
                 <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-1">
                   Seller
