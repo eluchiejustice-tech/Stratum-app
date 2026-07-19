@@ -7,6 +7,7 @@ import ConsultingBanner from "../components/ConsultingBanner";
 import AddListingModal from "../components/AddListingModal";
 import { MINERAL_COLORS } from "../utils/mineralColors";
 import { mapListingRow } from "../utils/mapListingRow";
+import { AFRICA_LOCATIONS } from "../data/africaLocations";
 import { useAuthContext } from "../context/AuthContext";
 import { useListings } from "../hooks/useListings";
 import {
@@ -20,13 +21,16 @@ export default function MarketplacePage({ onSellerClick, onListingClick, onMyLis
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
+  const [stateFilter, setStateFilter] = useState("");
+  const [lgaFilter, setLgaFilter] = useState("");
 
   const { user, role } = useAuthContext();
   const isModerator = role === "moderator";
 
   const { listings, loading, error, refresh } = useListings();
 
-  const cardListings = listings.map(mapListingRow);
+  const states = Object.keys(AFRICA_LOCATIONS.Nigeria);
+  const lgaOptions = stateFilter ? AFRICA_LOCATIONS.Nigeria[stateFilter].lgas : [];
 
   const addListing = async (form) => {
     const payload = {
@@ -94,15 +98,27 @@ export default function MarketplacePage({ onSellerClick, onListingClick, onMyLis
   };
 
   const minerals = ["All", ...Object.keys(MINERAL_COLORS)];
-  const visible = cardListings.filter((l) => {
-    const matchesFilter = filter === "All" || l.mineral === filter;
-    const matchesSearch =
-      search === "" ||
-      l.mineral.toLowerCase().includes(search.toLowerCase()) ||
-      l.location.toLowerCase().includes(search.toLowerCase()) ||
-      l.grade.toLowerCase().includes(search.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
+
+  // State/LGA are filtered against the raw Supabase rows (exact match on the
+  // real `state` / `local_government_area` columns) before mapping, since
+  // mapListingRow collapses those into a single display string. Mineral and
+  // free-text search continue to run on the mapped cards exactly as before.
+  const visible = listings
+    .filter((row) => {
+      const matchesState = !stateFilter || row.state === stateFilter;
+      const matchesLga = !lgaFilter || row.local_government_area === lgaFilter;
+      return matchesState && matchesLga;
+    })
+    .map(mapListingRow)
+    .filter((l) => {
+      const matchesFilter = filter === "All" || l.mineral === filter;
+      const matchesSearch =
+        search === "" ||
+        l.mineral.toLowerCase().includes(search.toLowerCase()) ||
+        l.location.toLowerCase().includes(search.toLowerCase()) ||
+        l.grade.toLowerCase().includes(search.toLowerCase());
+      return matchesFilter && matchesSearch;
+    });
 
   return (
     <div
@@ -115,6 +131,38 @@ export default function MarketplacePage({ onSellerClick, onListingClick, onMyLis
         <div className="mb-5 space-y-3">
           <SearchBar value={search} onChange={setSearch} />
           <FilterChips minerals={minerals} active={filter} onSelect={setFilter} />
+
+          <div className="flex gap-2">
+            <select
+              value={stateFilter}
+              onChange={(e) => {
+                setStateFilter(e.target.value);
+                setLgaFilter("");
+              }}
+              className="flex-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
+            >
+              <option value="">All States</option>
+              {states.map((state) => (
+                <option key={state} value={state}>
+                  {state}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={lgaFilter}
+              onChange={(e) => setLgaFilter(e.target.value)}
+              disabled={!stateFilter}
+              className="flex-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm disabled:bg-gray-100 disabled:text-gray-400"
+            >
+              <option value="">{stateFilter ? "All LGAs" : "Select State First"}</option>
+              {lgaOptions.map((lga) => (
+                <option key={lga.name} value={lga.name}>
+                  {lga.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="space-y-3">
