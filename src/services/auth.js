@@ -29,3 +29,16 @@ export async function getSession() {
 export async function getProfile(userId) {
   return supabase.from("profiles").select("*").eq("id", userId).single();
 }
+// Sends a password recovery email.
+export async function requestPasswordReset(email) {
+  return supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/?view=reset-password`,
+  });
+}
+
+// Updates the password after the recovery link creates a temporary recovery session.
+export async function updatePassword(newPassword) {
+  return supabase.auth.updateUser({
+    password: newPassword,
+  });
+}
