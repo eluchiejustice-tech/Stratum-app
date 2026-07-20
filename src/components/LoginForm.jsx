@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { X, Eye, EyeOff } from "lucide-react";
-import { signIn, signUp } from "../services/auth";
+import { signIn, signUp, requestPasswordReset } from "../services/auth";
 import RoleSelect from "./RoleSelect";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginForm({ onClose, onSuccess }) {
-  const [mode, setMode] = useState("login"); // "login" | "signup"
+  const [mode, setMode] = useState("login"); // "login" | "signup" | "forgotPassword"
 
   // Login state
   const [email, setEmail] = useState("");
@@ -27,6 +27,12 @@ export default function LoginForm({ onClose, onSuccess }) {
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showSignupConfirm, setShowSignupConfirm] = useState(false);
   const [signupBlockedExisting, setSignupBlockedExisting] = useState(false);
+
+  // Forgot password state
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetError, setResetError] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const handleLogin = async () => {
     setLoginError("");
@@ -95,12 +101,43 @@ export default function LoginForm({ onClose, onSuccess }) {
     setSignupSuccess(true);
   };
 
+  const handleRequestReset = async () => {
+    setResetError("");
+
+    const trimmedEmail = resetEmail.trim();
+    if (!EMAIL_PATTERN.test(trimmedEmail)) {
+      setResetError("Enter a valid email address.");
+      return;
+    }
+
+    setResetLoading(true);
+    const { error } = await requestPasswordReset(trimmedEmail);
+    setResetLoading(false);
+
+    // Supabase's resetPasswordForEmail never reveals whether the email is
+    // registered — it succeeds either way for anti-enumeration reasons. So
+    // an error here is a genuine system failure (network, rate limit, etc.),
+    // not "email not found", and it's safe to show a distinct message for
+    // it without compromising the anti-enumeration guarantee.
+    if (error) {
+      console.error("Password reset request error", error);
+      setResetError(
+        "We couldn't process your request right now. Please check your internet connection and try again."
+      );
+      return;
+    }
+
+    setResetSent(true);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-[#EDE8DC] w-full max-w-xs rounded-lg p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-serif text-lg text-[#15130F]">
-            {mode === "login" ? "Log in" : "Create your account"}
+            {mode === "login" && "Log in"}
+            {mode === "signup" && "Create your account"}
+            {mode === "forgotPassword" && "Reset your password"}
           </h2>
           <button onClick={onClose} className="p-1 text-[#3D4148] hover:text-[#15130F]">
             <X size={18} />
@@ -147,6 +184,20 @@ export default function LoginForm({ onClose, onSuccess }) {
             {loginError && (
               <p className="text-xs text-[#8a3b3b] mt-2 font-mono">{loginError}</p>
             )}
+
+            <p className="text-xs text-right mt-2">
+              <button
+                onClick={() => {
+                  setResetEmail(email);
+                  setResetError("");
+                  setResetSent(false);
+                  setMode("forgotPassword");
+                }}
+                className="text-[#3D4148]/70 underline hover:text-[#15130F]"
+              >
+                Forgot password?
+              </button>
+            </p>
 
             <button
               onClick={handleLogin}
@@ -273,6 +324,63 @@ export default function LoginForm({ onClose, onSuccess }) {
               className="text-xs underline text-[#3D4148] hover:text-[#15130F]"
             >
               Go to login
+            </button>
+          </div>
+        )}
+
+        {mode === "forgotPassword" && !resetSent && (
+          <>
+            <p className="text-sm text-[#3D4148] mb-3">
+              Enter your email and we'll send you a link to reset your password.
+            </p>
+
+            <input
+              type="email"
+              value={resetEmail}
+              onChange={(e) => {
+                setResetEmail(e.target.value);
+                setResetError("");
+              }}
+              onKeyDown={(e) => e.key === "Enter" && handleRequestReset()}
+              placeholder="Email"
+              className="w-full bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm mb-2"
+              autoFocus
+            />
+
+            {resetError && (
+              <p className="text-xs text-[#8a3b3b] mt-1 font-mono">{resetError}</p>
+            )}
+
+            <button
+              onClick={handleRequestReset}
+              disabled={resetLoading}
+              className="w-full mt-3 bg-[#15130F] text-[#EDE8DC] font-mono text-sm uppercase tracking-wide py-2.5 rounded hover:bg-[#3D4148] transition disabled:opacity-50"
+            >
+              {resetLoading ? "Sending..." : "Send reset link"}
+            </button>
+
+            <p className="text-xs text-[#3D4148] mt-3 text-center">
+              <button
+                onClick={() => setMode("login")}
+                className="underline hover:text-[#15130F]"
+              >
+                Back to login
+              </button>
+            </p>
+          </>
+        )}
+
+        {mode === "forgotPassword" && resetSent && (
+          <div className="text-center">
+            <p className="text-sm text-[#15130F] mb-3">
+              If an account exists for that email, a reset link has been sent.
+              Check your inbox, then follow the link to set a new password.
+            </p>
+            <button
+              onClick={() => setMode("login")}
+              className="text-xs underline text-[#3D4148] hover:text-[#15130F]"
+            >
+              Back to login
             </button>
           </div>
         )}
