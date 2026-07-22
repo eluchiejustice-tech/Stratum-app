@@ -1,7 +1,13 @@
-import { MapPin, Image as ImageIcon, MessageCircle, Check, Trash2 } from "lucide-react";
+import { MapPin, Image as ImageIcon, MessageCircle, Phone, Mail, Check, Trash2 } from "lucide-react";
 import CoreSample from "./CoreSample";
 import VerifiedBadge from "./VerifiedBadge";
-import { contactHref } from "../utils/contactHref";
+import { getContactOptions } from "../utils/contactHref";
+
+const CONTACT_ICONS = {
+  call: Phone,
+  whatsapp: MessageCircle,
+  email: Mail,
+};
 
 export default function ListingCard({
   listing,
@@ -16,6 +22,7 @@ export default function ListingCard({
   const sellerLabel = l.company || l.seller;
   const canOpenSellerProfile = Boolean(onSellerClick && l.sellerId);
   const canOpenListingDetail = Boolean(onListingClick && l.id);
+  const contactOptions = isAuthenticated ? getContactOptions(l.contact) : [];
 
   return (
     <div className="bg-white rounded-lg p-4 flex gap-4 shadow-sm border border-[#3D4148]/10">
@@ -78,7 +85,7 @@ export default function ListingCard({
             )}
             <div className="text-sm font-mono text-[#1F4D3D] mt-0.5">{l.price}</div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             {isAdmin && !l.verified && (
               <button
                 onClick={() => onVerify(l.id)}
@@ -101,17 +108,25 @@ export default function ListingCard({
               <span className="text-xs text-[#3D4148]/50 font-mono px-3 py-2">
                 Sign in to contact seller
               </span>
-            ) : contactHref(l.contact) ? (
-              <a
-                href={contactHref(l.contact)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 bg-[#1F4D3D] text-[#EDE8DC] text-xs font-mono uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition"
-              >
-                <MessageCircle size={13} /> Contact
-              </a>
+            ) : contactOptions.length > 0 ? (
+              contactOptions.map((opt) => {
+                const Icon = CONTACT_ICONS[opt.type];
+                return (
+                  <a
+                    key={opt.type}
+                    href={opt.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 bg-[#1F4D3D] text-[#EDE8DC] text-xs font-mono uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition"
+                  >
+                    <Icon size={13} /> {opt.label}
+                  </a>
+                );
+              })
             ) : (
-              <span className="text-xs text-[#3D4148]/50 font-mono px-3 py-2">No contact info</span>
+              <span className="text-xs text-[#3D4148]/50 font-mono px-3 py-2">
+                No contact information available
+              </span>
             )}
           </div>
         </div>
