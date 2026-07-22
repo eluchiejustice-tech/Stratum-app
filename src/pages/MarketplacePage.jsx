@@ -192,6 +192,7 @@ export default function MarketplacePage({ onSellerClick, onListingClick, onMyLis
                 key={l.id}
                 listing={l}
                 isAdmin={isModerator}
+                isAuthenticated={Boolean(user)}
                 onVerify={verifyListing}
                 onReject={rejectListing}
                 onSellerClick={onSellerClick}
