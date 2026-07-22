@@ -1,12 +1,12 @@
 import { supabase } from "./supabaseClient";
 
 export async function getProfileById(id) {
-  return supabase.from("profiles").select("*").eq("id", id).single();
+  return supabase.from("profiles_public").select("*").eq("id", id).single();
 }
 
 export async function getApprovedListingsBySeller(sellerId) {
   return supabase
-    .from("mineral_listings")
+    .from("mineral_listings_public")
     .select("*")
     .eq("seller_id", sellerId)
     .eq("status", "verified");
