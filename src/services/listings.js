@@ -8,14 +8,14 @@ const LISTING_COLUMNS =
 
 export async function getListings() {
   return supabase
-    .from("mineral_listings")
+    .from("mineral_listings_public")
     .select(LISTING_COLUMNS)
     .order("created_at", { ascending: false });
 }
 
 export async function getListingById(id) {
   return supabase
-    .from("mineral_listings")
+    .from("mineral_listings_public")
     .select(LISTING_COLUMNS)
     .eq("id", id)
     .single();
@@ -23,7 +23,7 @@ export async function getListingById(id) {
 
 export async function getListingsBySeller(sellerId) {
   return supabase
-    .from("mineral_listings")
+    .from("mineral_listings_public")
     .select(LISTING_COLUMNS)
     .eq("seller_id", sellerId)
     .order("created_at", { ascending: false });
