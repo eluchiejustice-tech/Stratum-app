@@ -4,6 +4,7 @@ import ListingCard from "../components/ListingCard";
 import { mapListingRow } from "../utils/mapListingRow";
 import { contactHref } from "../utils/contactHref";
 import { getProfileById, getApprovedListingsBySeller } from "../services/profiles";
+import { useAuthContext } from "../context/AuthContext";
 
 function VerificationStatusBadge({ status }) {
   const s = (status || "unverified").toLowerCase();
@@ -33,6 +34,7 @@ function VerificationStatusBadge({ status }) {
 }
 
 export default function SellerProfilePage({ sellerId, onBack, onListingClick }) {
+  const { user } = useAuthContext();
   const [profile, setProfile] = useState(null);
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -147,7 +149,9 @@ export default function SellerProfilePage({ sellerId, onBack, onListingClick }) 
                   </span>
                 )}
 
-                {contactHref(profile.contact) ? (
+                {!user ? (
+                  <span className="text-[#3D4148]/50">Sign in to contact seller</span>
+                ) : contactHref(profile.contact) ? (
                   <a
                     href={contactHref(profile.contact)}
                     target="_blank"
@@ -184,6 +188,7 @@ export default function SellerProfilePage({ sellerId, onBack, onListingClick }) 
                   key={l.id}
                   listing={l}
                   isAdmin={false}
+                  isAuthenticated={Boolean(user)}
                   onListingClick={onListingClick}
                 />
               ))}
