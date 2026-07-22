@@ -6,6 +6,7 @@ import { contactHref } from "../utils/contactHref";
 export default function ListingCard({
   listing,
   isAdmin,
+  isAuthenticated,
   onVerify,
   onReject,
   onSellerClick,
@@ -96,7 +97,11 @@ export default function ListingCard({
                 <Trash2 size={13} />
               </button>
             )}
-            {contactHref(l.contact) ? (
+            {!isAuthenticated ? (
+              <span className="text-xs text-[#3D4148]/50 font-mono px-3 py-2">
+                Sign in to contact seller
+              </span>
+            ) : contactHref(l.contact) ? (
               <a
                 href={contactHref(l.contact)}
                 target="_blank"
