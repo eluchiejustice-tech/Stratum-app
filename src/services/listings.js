@@ -1,20 +1,30 @@
 import { supabase } from "./supabaseClient";
 
+const LISTING_COLUMNS =
+  "id, seller_id, mineral, category, description, quantity, mineral_grade, " +
+  "country, state, location, availability, price, photo_url, status, " +
+  "created_at, seller_name, seller_contact, seller_company, " +
+  "local_government_area, document_url";
+
 export async function getListings() {
   return supabase
     .from("mineral_listings")
-    .select("*")
+    .select(LISTING_COLUMNS)
     .order("created_at", { ascending: false });
 }
 
 export async function getListingById(id) {
-  return supabase.from("mineral_listings").select("*").eq("id", id).single();
+  return supabase
+    .from("mineral_listings")
+    .select(LISTING_COLUMNS)
+    .eq("id", id)
+    .single();
 }
 
 export async function getListingsBySeller(sellerId) {
   return supabase
     .from("mineral_listings")
-    .select("*")
+    .select(LISTING_COLUMNS)
     .eq("seller_id", sellerId)
     .order("created_at", { ascending: false });
 }
