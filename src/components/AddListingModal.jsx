@@ -188,8 +188,10 @@ export default function AddListingModal({ onClose, onAdd }) {
       return;
     }
 
-    const { data } = supabase.storage.from("listing-documents").getPublicUrl(fileName);
-    setForm((f) => ({ ...f, documentUrl: data.publicUrl }));
+    // Storage path only — not a public URL. The listing-documents bucket
+    // is private; access happens via signed URLs generated on read,
+    // never a permanent public link.
+    setForm((f) => ({ ...f, documentUrl: fileName }));
     setUploadingDoc(false);
   };
 
