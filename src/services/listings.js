@@ -45,6 +45,23 @@ export async function createListingPhotos(listingId, photos) {
   return supabase.from("listing_photos").insert(rows);
 }
 
+// Saves a reference to the seller's uploaded assay report/certificate for
+// a listing. Only called after the listing row itself has been created,
+// since listing_id is a required FK — same timing as createListingPhotos.
+// storagePath is the bucket-relative path (not a public URL), since the
+// listing-documents bucket is private and access is via signed URLs.
+// Document verification is independent of listing status, so this always
+// starts as "pending" regardless of the listing's own approval state.
+export async function createListingDocument(listingId, storagePath, uploadedBy) {
+  return supabase.from("mineral_documents").insert({
+    listing_id: listingId,
+    document_type: "assay_report",
+    file_url: storagePath,
+    uploaded_by: uploadedBy,
+    verification_status: "pending",
+  });
+}
+
 export async function getPhotosByListing(listingId) {
   return supabase
     .from("listing_photos")
