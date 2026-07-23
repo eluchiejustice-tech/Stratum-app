@@ -13,6 +13,7 @@ import { useListings } from "../hooks/useListings";
 import {
   createListing,
   createListingPhotos,
+  createListingDocument,
   updateListingStatus,
   createVerificationRecord,
 } from "../services/listings";
@@ -63,6 +64,17 @@ export default function MarketplacePage({ onSellerClick, onListingClick, onMyLis
       const { error: photosError } = await createListingPhotos(newListing.id, form.photos);
       if (photosError) {
         console.error("Failed to save listing photos", photosError);
+      }
+    }
+
+    if (form.documentUrl) {
+      const { error: documentError } = await createListingDocument(
+        newListing.id,
+        form.documentUrl,
+        user.id
+      );
+      if (documentError) {
+        console.error("Failed to save listing document", documentError);
       }
     }
 
