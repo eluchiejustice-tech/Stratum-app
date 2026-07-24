@@ -19,8 +19,12 @@ const PRICE_PATTERN = /^[$₦€£]?\s?[\d,]+(\.\d+)?(\s?\/\s?\w+)?$/;
 const PHONE_PATTERN = /^[+\d][\d\s\-()]{6,19}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function validate(form, photos) {
+function validate(form, photos, customMineral) {
   const errors = {};
+
+  if (form.mineral === "Other" && !customMineral.trim()) {
+    errors.customMineral = "Please specify the mineral.";
+  }
 
   if (!form.grade.trim()) errors.grade = "Grade / spec is required.";
 
@@ -71,6 +75,7 @@ export default function AddListingModal({ onClose, onAdd }) {
     price: "",
     documentUrl: "",
   });
+  const [customMineral, setCustomMineral] = useState("");
   const [photos, setPhotos] = useState([]);
   const [photoError, setPhotoError] = useState("");
   const [errors, setErrors] = useState({});
@@ -198,16 +203,17 @@ export default function AddListingModal({ onClose, onAdd }) {
   const anyPhotoUploading = photos.some((p) => p.uploading);
 
   const submit = () => {
-    const validationErrors = validate(form, photos);
+    const validationErrors = validate(form, photos, customMineral);
     setErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) return;
     if (anyPhotoUploading || uploadingDoc) return;
 
     const quantity = `${form.quantityAmount.trim()} ${form.quantityUnit}`;
+    const mineral = form.mineral === "Other" ? customMineral.trim() : form.mineral;
 
     onAdd({
-      mineral: form.mineral,
+      mineral,
       grade: form.grade.trim(),
       quantity,
       state: form.state.trim(),
@@ -248,6 +254,30 @@ export default function AddListingModal({ onClose, onAdd }) {
               ))}
             </select>
           </div>
+
+          {form.mineral === "Other" && (
+            <div>
+              <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">
+                Specify mineral
+              </label>
+              <input
+                value={customMineral}
+                onChange={(e) => {
+                  setCustomMineral(e.target.value);
+                  if (errors.customMineral) {
+                    setErrors((err) => ({ ...err, customMineral: undefined }));
+                  }
+                }}
+                placeholder="e.g. Lead Ore, Zinc Ore"
+                className={`w-full mt-1 bg-white border rounded px-3 py-2 text-sm ${
+                  errors.customMineral ? "border-[#8a3b3b]" : "border-[#3D4148]/20"
+                }`}
+              />
+              {errors.customMineral && (
+                <p className="text-[10px] text-[#8a3b3b] mt-1">{errors.customMineral}</p>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">Grade / spec</label>
