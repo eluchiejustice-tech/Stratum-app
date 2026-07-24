@@ -48,7 +48,6 @@ export default function MarketplacePage({ onSellerClick, onListingClick, onMyLis
       availability: "in_stock",
       price: form.price,
       photo_url: form.photos?.[0]?.url || null,
-      document_url: form.documentUrl || null,
       seller_name: form.seller,
       seller_company: form.company,
       seller_contact: form.contact,
