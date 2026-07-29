@@ -21,7 +21,6 @@ export function mapListingRow(row) {
     statusRaw: row.status,
     price: row.price,
     photoUrl: row.photo_url,
-    documentUrl: row.document_url,
     strata: bandsFor(row.mineral),
   };
 }
