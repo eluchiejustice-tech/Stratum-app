@@ -124,7 +124,7 @@ export default function MyListingsPage({ onBack, onListingClick, onSellerClick }
             />
             <StatusSection
               title="Rejected"
-              note="These listings were not approved. Edit and resubmit, or contact support for details."
+              note="These listings were not approved. You can submit a new listing or contact support if you need more information."
               listings={rejected}
               onListingClick={onListingClick}
               onSellerClick={onSellerClick}
