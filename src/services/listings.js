@@ -4,7 +4,7 @@ const LISTING_COLUMNS =
   "id, seller_id, mineral, category, description, quantity, mineral_grade, " +
   "country, state, location, availability, price, photo_url, status, " +
   "created_at, seller_name, seller_contact, seller_company, " +
-  "local_government_area, document_url";
+  "local_government_area";
 
 export async function getListings() {
   return supabase
