@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { X } from "lucide-react";
 import Header from "../components/Header";
 import SearchBar from "../components/SearchBar";
 import FilterChips from "../components/FilterChips";
@@ -18,12 +19,19 @@ import {
   createVerificationRecord,
 } from "../services/listings";
 
+const UPLOAD_WARNING_MESSAGES = {
+  photos: "Your listing was created successfully, but the photos could not be uploaded.",
+  document: "Your listing was created successfully, but the document could not be uploaded.",
+  both: "Your listing was created successfully, but some attachments could not be uploaded.",
+};
+
 export default function MarketplacePage({ onSellerClick, onListingClick, onMyListings }) {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [stateFilter, setStateFilter] = useState("");
   const [lgaFilter, setLgaFilter] = useState("");
+  const [uploadWarning, setUploadWarning] = useState(null);
 
   const { user, role } = useAuthContext();
   const isModerator = role === "moderator";
@@ -32,6 +40,11 @@ export default function MarketplacePage({ onSellerClick, onListingClick, onMyLis
 
   const states = Object.keys(AFRICA_LOCATIONS.Nigeria);
   const lgaOptions = stateFilter ? AFRICA_LOCATIONS.Nigeria[stateFilter].lgas : [];
+
+  const openAddListing = () => {
+    setUploadWarning(null);
+    setShowAdd(true);
+  };
 
   const addListing = async (form) => {
     const payload = {
@@ -59,10 +72,14 @@ export default function MarketplacePage({ onSellerClick, onListingClick, onMyLis
       return;
     }
 
+    let photosFailed = false;
+    let documentFailed = false;
+
     if (form.photos && form.photos.length > 0) {
       const { error: photosError } = await createListingPhotos(newListing.id, form.photos);
       if (photosError) {
         console.error("Failed to save listing photos", photosError);
+        photosFailed = true;
       }
     }
 
@@ -74,7 +91,16 @@ export default function MarketplacePage({ onSellerClick, onListingClick, onMyLis
       );
       if (documentError) {
         console.error("Failed to save listing document", documentError);
+        documentFailed = true;
       }
+    }
+
+    if (photosFailed && documentFailed) {
+      setUploadWarning(UPLOAD_WARNING_MESSAGES.both);
+    } else if (photosFailed) {
+      setUploadWarning(UPLOAD_WARNING_MESSAGES.photos);
+    } else if (documentFailed) {
+      setUploadWarning(UPLOAD_WARNING_MESSAGES.document);
     }
 
     await refresh();
@@ -136,9 +162,25 @@ export default function MarketplacePage({ onSellerClick, onListingClick, onMyLis
       className="min-h-screen bg-[#EDE8DC] text-[#15130F]"
       style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
     >
-      <Header onAddListing={() => setShowAdd(true)} onMyListings={onMyListings} />
+      <Header onAddListing={openAddListing} onMyListings={onMyListings} />
 
       <main className="max-w-4xl mx-auto px-5 sm:px-8 py-6">
+        {uploadWarning && (
+          <div
+            className="flex items-start justify-between gap-3 bg-[#9c7a1f]/10 border border-[#9c7a1f]/30 text-[#9c7a1f] text-sm rounded px-4 py-3 mb-4"
+            style={{ fontFamily: "system-ui, sans-serif" }}
+          >
+            <span>{uploadWarning}</span>
+            <button
+              onClick={() => setUploadWarning(null)}
+              aria-label="Dismiss"
+              className="shrink-0 text-[#9c7a1f] hover:text-[#15130F] transition"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
         <div className="mb-5 space-y-3">
           <SearchBar value={search} onChange={setSearch} />
           <FilterChips minerals={minerals} active={filter} onSelect={setFilter} />
