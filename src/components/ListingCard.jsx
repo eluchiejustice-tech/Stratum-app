@@ -1,4 +1,4 @@
-import { MapPin, Image as ImageIcon, MessageCircle, Phone, Mail, Check, Trash2 } from "lucide-react";
+import { MapPin, Image as ImageIcon, MessageCircle, Phone, Mail, Check, Trash2, Bookmark, BookmarkCheck } from "lucide-react";
 import CoreSample from "./CoreSample";
 import VerifiedBadge from "./VerifiedBadge";
 import { getContactOptions } from "../utils/contactHref";
@@ -13,6 +13,8 @@ export default function ListingCard({
   listing,
   isAdmin,
   isAuthenticated,
+  isSaved,
+  onToggleSave,
   onVerify,
   onReject,
   onSellerClick,
@@ -47,7 +49,18 @@ export default function ListingCard({
               {l.grade}
             </div>
           </div>
-          <VerifiedBadge verified={l.verified} />
+          <div className="flex items-center gap-2 shrink-0">
+            {isAuthenticated && (
+              <button
+                onClick={() => onToggleSave(l.id)}
+                title={isSaved ? "Remove from saved listings" : "Save listing"}
+                className="text-[#3D4148]/50 hover:text-[#1F4D3D] transition"
+              >
+                {isSaved ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
+              </button>
+            )}
+            <VerifiedBadge verified={l.verified} />
+          </div>
         </div>
         <div
           className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-[#3D4148]"
