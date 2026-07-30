@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Layers, Plus, Lock, Shield, LogOut, UserCog, ClipboardList } from "lucide-react";
+import { Layers, Plus, Lock, Shield, LogOut, UserCog, ClipboardList, LayoutDashboard } from "lucide-react";
 import { useAuthContext } from "../context/AuthContext";
 import { signOut } from "../services/auth";
 import LoginForm from "./LoginForm";
@@ -7,7 +7,7 @@ import EditProfileModal from "./EditProfileModal";
 
 const LISTING_ROLES = ["miner_supplier", "company", "professional", "mineral_agent", "moderator"];
 
-export default function Header({ onAddListing, onMyListings }) {
+export default function Header({ onAddListing, onMyListings, onBuyerDashboard }) {
   const { user, profile, role, loading, refreshProfile } = useAuthContext();
   const [showLogin, setShowLogin] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -41,6 +41,17 @@ export default function Header({ onAddListing, onMyListings }) {
               >
                 <Shield size={14} />
               </div>
+            )}
+
+            {!loading && user && (
+              <button
+                onClick={onBuyerDashboard}
+                title="My dashboard"
+                className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-wide px-3 py-2 rounded bg-transparent text-[#EDE8DC]/70 border border-[#EDE8DC]/30 hover:brightness-110 transition"
+              >
+                <LayoutDashboard size={14} />
+                My dashboard
+              </button>
             )}
 
             {!loading && user && canCreateListings && (
