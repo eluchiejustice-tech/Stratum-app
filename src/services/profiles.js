@@ -12,16 +12,22 @@ export async function getApprovedListingsBySeller(sellerId) {
     .eq("status", "verified");
 }
 
-// Updates only the self-editable fields on the caller's own profile row.
-// role and verification_status are intentionally never included here —
-// the "Users can update own profile" RLS policy's WITH CHECK clause
-// requires those two columns to stay unchanged, so omitting them from
-// the update payload satisfies that constraint automatically.
+// Updates the self-editable fields on the caller's own profile row.
+// verification_status is intentionally never included here — the
+// "Users can update own profile" RLS policy's WITH CHECK clause requires
+// it to stay unchanged, so omitting it from the update payload satisfies
+// that constraint automatically.
+//
+// role IS included as of Stage 8C's listing-creation role gate: users may
+// now self-select among the five non-moderator roles (buyer,
+// miner_supplier, professional, company, mineral_agent). Attempting to set
+// role to "moderator" is still rejected — independently enforced by the
+// same RLS policy's WITH CHECK clause, regardless of what a client sends.
 export async function updateProfile(id, updates) {
-  const { name, company, bio, contact, location } = updates;
+  const { name, company, bio, contact, location, role } = updates;
   return supabase
     .from("profiles")
-    .update({ name, company, bio, contact, location })
+    .update({ name, company, bio, contact, location, role })
     .eq("id", id)
     .select()
     .single();
