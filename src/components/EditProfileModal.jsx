@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { updateProfile } from "../services/profiles";
+import RoleSelect from "./RoleSelect";
 
 export default function EditProfileModal({ userId, profile, onClose, onSaved }) {
   const [name, setName] = useState(profile?.name || "");
@@ -8,6 +9,7 @@ export default function EditProfileModal({ userId, profile, onClose, onSaved }) 
   const [bio, setBio] = useState(profile?.bio || "");
   const [contact, setContact] = useState(profile?.contact || "");
   const [location, setLocation] = useState(profile?.location || "");
+  const [role, setRole] = useState(profile?.role || "buyer");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -26,6 +28,7 @@ export default function EditProfileModal({ userId, profile, onClose, onSaved }) 
       bio: bio.trim() || null,
       contact: contact.trim() || null,
       location: location.trim() || null,
+      role,
     });
     setSaving(false);
 
@@ -48,9 +51,7 @@ export default function EditProfileModal({ userId, profile, onClose, onSaved }) 
           </button>
         </div>
 
-        <label
-          className="block text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/60 mb-1"
-        >
+        <label className="block text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/60 mb-1">
           Name
         </label>
         <input
@@ -62,9 +63,11 @@ export default function EditProfileModal({ userId, profile, onClose, onSaved }) 
           autoFocus
         />
 
-        <label
-          className="block text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/60 mb-1"
-        >
+        <div className="mb-3">
+          <RoleSelect value={role} onChange={setRole} />
+        </div>
+
+        <label className="block text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/60 mb-1">
           Company / business name
         </label>
         <input
@@ -75,9 +78,7 @@ export default function EditProfileModal({ userId, profile, onClose, onSaved }) 
           className="w-full bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm mb-3"
         />
 
-        <label
-          className="block text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/60 mb-1"
-        >
+        <label className="block text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/60 mb-1">
           Bio
         </label>
         <textarea
@@ -88,9 +89,7 @@ export default function EditProfileModal({ userId, profile, onClose, onSaved }) 
           className="w-full bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm mb-3 resize-none"
         />
 
-        <label
-          className="block text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/60 mb-1"
-        >
+        <label className="block text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/60 mb-1">
           Contact
         </label>
         <input
@@ -101,9 +100,7 @@ export default function EditProfileModal({ userId, profile, onClose, onSaved }) 
           className="w-full bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm mb-3"
         />
 
-        <label
-          className="block text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/60 mb-1"
-        >
+        <label className="block text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/60 mb-1">
           Location
         </label>
         <input
