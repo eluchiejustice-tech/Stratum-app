@@ -4,6 +4,10 @@ export async function getProfileById(id) {
   return supabase.from("profiles_public").select("*").eq("id", id).single();
 }
 
+export async function getProfilesByIds(ids) {
+  return supabase.from("profiles_public").select("*").in("id", ids);
+}
+
 export async function getApprovedListingsBySeller(sellerId) {
   return supabase
     .from("mineral_listings_public")
