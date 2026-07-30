@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, MapPin, MessageCircle, Phone, Mail, ShieldCheck } from "lucide-react";
+import { ArrowLeft, MapPin, MessageCircle, Phone, Mail, ShieldCheck, Heart } from "lucide-react";
 import ListingCard from "../components/ListingCard";
 import { mapListingRow } from "../utils/mapListingRow";
 import { getContactOptions } from "../utils/contactHref";
 import { getProfileById, getApprovedListingsBySeller } from "../services/profiles";
+import { getFavouriteSellers, favouriteSeller, unfavouriteSeller } from "../services/favouriteSellers";
+import { getSavedListings, saveListing, unsaveListing } from "../services/savedListings";
 import { useAuthContext } from "../context/AuthContext";
 
 const CONTACT_ICONS = {
@@ -45,6 +47,8 @@ export default function SellerProfilePage({ sellerId, onBack, onListingClick }) 
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isFavourited, setIsFavourited] = useState(false);
+  const [savedListingIds, setSavedListingIds] = useState(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -82,10 +86,87 @@ export default function SellerProfilePage({ sellerId, onBack, onListingClick }) 
     };
   }, [sellerId]);
 
+  // Buyer-experience state (saved listings, favourite sellers) is loaded
+  // separately from the profile/listings load above, since it depends on
+  // the signed-in user rather than just sellerId, and its failure shouldn't
+  // block the page from rendering the seller's public profile.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBuyerState() {
+      if (!user) {
+        setIsFavourited(false);
+        setSavedListingIds(new Set());
+        return;
+      }
+
+      const [favouritesRes, savedRes] = await Promise.all([
+        getFavouriteSellers(user.id),
+        getSavedListings(user.id),
+      ]);
+
+      if (cancelled) return;
+
+      if (favouritesRes.error) {
+        console.error("Failed to load favourite sellers", favouritesRes.error);
+      } else {
+        setIsFavourited(
+          (favouritesRes.data || []).some((row) => row.seller_id === sellerId)
+        );
+      }
+
+      if (savedRes.error) {
+        console.error("Failed to load saved listings", savedRes.error);
+      } else {
+        setSavedListingIds(new Set((savedRes.data || []).map((row) => row.listing_id)));
+      }
+    }
+
+    loadBuyerState();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, sellerId]);
+
+  const toggleFavouriteSeller = async () => {
+    if (!user || user.id === sellerId) return;
+    const { error } = isFavourited
+      ? await unfavouriteSeller(user.id, sellerId)
+      : await favouriteSeller(user.id, sellerId);
+    if (error) {
+      console.error("Failed to toggle favourite seller", error);
+      return;
+    }
+    setIsFavourited((prev) => !prev);
+  };
+
+  const toggleSaveListing = async (listingId) => {
+    if (!user) return;
+    const isSaved = savedListingIds.has(listingId);
+    const { error } = isSaved
+      ? await unsaveListing(user.id, listingId)
+      : await saveListing(user.id, listingId);
+    if (error) {
+      console.error("Failed to toggle saved listing", error);
+      return;
+    }
+    setSavedListingIds((prev) => {
+      const next = new Set(prev);
+      if (isSaved) {
+        next.delete(listingId);
+      } else {
+        next.add(listingId);
+      }
+      return next;
+    });
+  };
+
   // Mapping logic now lives in utils/mapListingRow.js, shared with
   // MarketplacePage.jsx.
   const cardListings = listings.map(mapListingRow);
   const contactOptions = user ? getContactOptions(profile?.contact) : [];
+  const isOwnProfile = Boolean(user && user.id === sellerId);
 
   return (
     <div
@@ -134,7 +215,18 @@ export default function SellerProfilePage({ sellerId, onBack, onListingClick }) 
                     </div>
                   )}
                 </div>
-                <VerificationStatusBadge status={profile.verification_status} />
+                <div className="flex items-center gap-2 shrink-0">
+                  {user && !isOwnProfile && (
+                    <button
+                      onClick={toggleFavouriteSeller}
+                      title={isFavourited ? "Remove from favourite sellers" : "Favourite this seller"}
+                      className="text-[#3D4148]/50 hover:text-[#8a3b3b] transition"
+                    >
+                      <Heart size={16} fill={isFavourited ? "currentColor" : "none"} />
+                    </button>
+                  )}
+                  <VerificationStatusBadge status={profile.verification_status} />
+                </div>
               </div>
 
               {profile.bio && (
@@ -202,6 +294,8 @@ export default function SellerProfilePage({ sellerId, onBack, onListingClick }) 
                   listing={l}
                   isAdmin={false}
                   isAuthenticated={Boolean(user)}
+                  isSaved={savedListingIds.has(l.id)}
+                  onToggleSave={toggleSaveListing}
                   onListingClick={onListingClick}
                 />
               ))}
