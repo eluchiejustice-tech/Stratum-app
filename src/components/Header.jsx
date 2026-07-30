@@ -5,12 +5,15 @@ import { signOut } from "../services/auth";
 import LoginForm from "./LoginForm";
 import EditProfileModal from "./EditProfileModal";
 
+const LISTING_ROLES = ["miner_supplier", "company", "professional", "mineral_agent", "moderator"];
+
 export default function Header({ onAddListing, onMyListings }) {
   const { user, profile, role, loading, refreshProfile } = useAuthContext();
   const [showLogin, setShowLogin] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
 
   const isModerator = role === "moderator";
+  const canCreateListings = LISTING_ROLES.includes(role);
 
   const handleLogout = async () => {
     await signOut();
@@ -40,7 +43,7 @@ export default function Header({ onAddListing, onMyListings }) {
               </div>
             )}
 
-            {!loading && user && (
+            {!loading && user && canCreateListings && (
               <button
                 onClick={onMyListings}
                 title="My listings"
@@ -84,12 +87,14 @@ export default function Header({ onAddListing, onMyListings }) {
               </button>
             )}
 
-            <button
-              onClick={onAddListing}
-              className="flex items-center gap-1.5 bg-[#B8922F] text-[#15130F] font-mono text-xs uppercase px-3 py-2 rounded hover:brightness-110 transition"
-            >
-              <Plus size={14} strokeWidth={2.5} /> List
-            </button>
+            {!loading && user && canCreateListings && (
+              <button
+                onClick={onAddListing}
+                className="flex items-center gap-1.5 bg-[#B8922F] text-[#15130F] font-mono text-xs uppercase px-3 py-2 rounded hover:brightness-110 transition"
+              >
+                <Plus size={14} strokeWidth={2.5} /> List
+              </button>
+            )}
           </div>
         </div>
       </header>
