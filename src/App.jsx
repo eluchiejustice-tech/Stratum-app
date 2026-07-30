@@ -3,6 +3,7 @@ import MarketplacePage from "./pages/MarketplacePage";
 import SellerProfilePage from "./pages/SellerProfilePage";
 import ListingDetailPage from "./pages/ListingDetailPage";
 import MyListingsPage from "./pages/MyListingsPage";
+import BuyerDashboardPage from "./pages/BuyerDashboardPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { AuthProvider } from "./context/AuthContext";
 
@@ -41,6 +42,10 @@ export default function App() {
     setView("myListings");
   };
 
+  const openBuyerDashboard = () => {
+    setView("buyerDashboard");
+  };
+
   const backToMarketplace = () => {
     setView("marketplace");
     setSelectedSellerId(null);
@@ -76,11 +81,18 @@ export default function App() {
           onListingClick={openListingDetail}
           onSellerClick={openSellerProfile}
         />
+      ) : view === "buyerDashboard" ? (
+        <BuyerDashboardPage
+          onBack={backToMarketplace}
+          onListingClick={openListingDetail}
+          onSellerClick={openSellerProfile}
+        />
       ) : (
         <MarketplacePage
           onSellerClick={openSellerProfile}
           onListingClick={openListingDetail}
           onMyListings={openMyListings}
+          onBuyerDashboard={openBuyerDashboard}
         />
       )}
     </AuthProvider>
