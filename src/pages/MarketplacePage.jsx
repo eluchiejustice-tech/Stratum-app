@@ -131,4 +131,64 @@ export default function MarketplacePage({ onSellerClick, onListingClick, onMyLis
     const { error: updateError } = await updateListingStatus(id, "verified");
     if (!updateError) {
       await createVerificationRecord({
-        ve
+        verification_type: "listing",
+        reference_id: id,
+        verified_by: user.id,
+        status: "verified",
+        notes: null,
+      });
+    }
+    await refresh();
+  };
+
+  const rejectListing = async (id) => {
+    const { error: updateError } = await updateListingStatus(id, "rejected");
+    if (!updateError) {
+      await createVerificationRecord({
+        verification_type: "listing",
+        reference_id: id,
+        verified_by: user.id,
+        status: "rejected",
+        notes: null,
+      });
+    }
+    await refresh();
+  };
+
+  const toggleSaveListing = async (listingId) => {
+    if (!user) return;
+    const isSaved = savedListingIds.has(listingId);
+    const { error } = isSaved
+      ? await unsaveListing(user.id, listingId)
+      : await saveListing(user.id, listingId);
+    if (error) {
+      console.error("Failed to toggle saved listing", error);
+      return;
+    }
+    setSavedListingIds((prev) => {
+      const next = new Set(prev);
+      if (isSaved) {
+        next.delete(listingId);
+      } else {
+        next.add(listingId);
+      }
+      return next;
+    });
+  };
+
+  const minerals = ["All", ...Object.keys(MINERAL_COLORS)];
+
+  // State/LGA are filtered against the raw Supabase rows (exact match on the
+  // real `state` / `local_government_area` columns) before mapping, since
+  // mapListingRow collapses those into a single display string. Mineral and
+  // free-text search continue to run on the mapped cards exactly as before.
+  const visible = listings
+    .filter((row) => {
+      const matchesState = !stateFilter || row.state === stateFilter;
+      const matchesLga = !lgaFilter || row.local_government_area === lgaFilter;
+      return matchesState && matchesLga;
+    })
+    .map(mapListingRow)
+    .filter((l) => {
+      const matchesFilter = filter === "All" || l.mineral === filter;
+      const
