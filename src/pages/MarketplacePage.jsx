@@ -118,4 +118,196 @@ export default function MarketplacePage({ onSellerClick, onListingClick, onMyLis
 
     if (photosFailed && documentFailed) {
       setUploadWarning(UPLOAD_WARNING_MESSAGES.both);
-    } else if (photosFailed)
+    } else if (photosFailed) {
+      setUploadWarning(UPLOAD_WARNING_MESSAGES.photos);
+    } else if (documentFailed) {
+      setUploadWarning(UPLOAD_WARNING_MESSAGES.document);
+    }
+
+    await refresh();
+  };
+
+  const verifyListing = async (id) => {
+    const { error: updateError } = await updateListingStatus(id, "verified");
+    if (!updateError) {
+      await createVerificationRecord({
+        verification_type: "listing",
+        reference_id: id,
+        verified_by: user.id,
+        status: "verified",
+        notes: null,
+      });
+    }
+    await refresh();
+  };
+
+  const rejectListing = async (id) => {
+    const { error: updateError } = await updateListingStatus(id, "rejected");
+    if (!updateError) {
+      await createVerificationRecord({
+        verification_type: "listing",
+        reference_id: id,
+        verified_by: user.id,
+        status: "rejected",
+        notes: null,
+      });
+    }
+    await refresh();
+  };
+
+  const toggleSaveListing = async (listingId) => {
+    if (!user) return;
+    const isSaved = savedListingIds.has(listingId);
+    const { error } = isSaved
+      ? await unsaveListing(user.id, listingId)
+      : await saveListing(user.id, listingId);
+    if (error) {
+      console.error("Failed to toggle saved listing", error);
+      return;
+    }
+    setSavedListingIds((prev) => {
+      const next = new Set(prev);
+      if (isSaved) {
+        next.delete(listingId);
+      } else {
+        next.add(listingId);
+      }
+      return next;
+    });
+  };
+
+  const minerals = ["All", ...Object.keys(MINERAL_COLORS)];
+
+  // State/LGA are filtered against the raw Supabase rows (exact match on the
+  // real `state` / `local_government_area` columns) before mapping, since
+  // mapListingRow collapses those into a single display string. Mineral and
+  // free-text search continue to run on the mapped cards exactly as before.
+  const visible = listings
+    .filter((row) => {
+      const matchesState = !stateFilter || row.state === stateFilter;
+      const matchesLga = !lgaFilter || row.local_government_area === lgaFilter;
+      return matchesState && matchesLga;
+    })
+    .map(mapListingRow)
+    .filter((l) => {
+      const matchesFilter = filter === "All" || l.mineral === filter;
+      const matchesSearch =
+        search === "" ||
+        l.mineral.toLowerCase().includes(search.toLowerCase()) ||
+        l.location.toLowerCase().includes(search.toLowerCase()) ||
+        l.grade.toLowerCase().includes(search.toLowerCase());
+      return matchesFilter && matchesSearch;
+    });
+
+  return (
+    <div
+      className="min-h-screen bg-[#EDE8DC] text-[#15130F]"
+      style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+    >
+      <Header
+        onAddListing={openAddListing}
+        onMyListings={onMyListings}
+        onBuyerDashboard={onBuyerDashboard}
+      />
+
+      <main className="max-w-4xl mx-auto px-5 sm:px-8 py-6">
+        {uploadWarning && (
+          <div
+            className="flex items-start justify-between gap-3 bg-[#9c7a1f]/10 border border-[#9c7a1f]/30 text-[#9c7a1f] text-sm rounded px-4 py-3 mb-4"
+            style={{ fontFamily: "system-ui, sans-serif" }}
+          >
+            <span>{uploadWarning}</span>
+            <button
+              onClick={() => setUploadWarning(null)}
+              aria-label="Dismiss"
+              className="shrink-0 text-[#9c7a1f] hover:text-[#15130F] transition"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        <div className="mb-5 space-y-3">
+          <SearchBar value={search} onChange={setSearch} />
+          <FilterChips minerals={minerals} active={filter} onSelect={setFilter} />
+
+          <div className="flex gap-2">
+            <select
+              value={stateFilter}
+              onChange={(e) => {
+                setStateFilter(e.target.value);
+                setLgaFilter("");
+              }}
+              className="flex-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
+            >
+              <option value="">All States</option>
+              {states.map((state) => (
+                <option key={state} value={state}>
+                  {state}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={lgaFilter}
+              onChange={(e) => setLgaFilter(e.target.value)}
+              disabled={!stateFilter}
+              className="flex-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm disabled:bg-gray-100 disabled:text-gray-400"
+            >
+              <option value="">{stateFilter ? "All LGAs" : "Select State First"}</option>
+              {lgaOptions.map((lga) => (
+                <option key={lga.name} value={lga.name}>
+                  {lga.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {loading && (
+            <div className="text-center py-12 text-[#3D4148]/60">Loading listings…</div>
+          )}
+
+          {error && (
+            <div className="text-center py-12 text-[#8a3b3b]">
+              Couldn't load listings. Please try again.
+            </div>
+          )}
+
+          {!loading && !error && visible.length === 0 && (
+            <div
+              className="text-center py-12 text-[#3D4148]/60"
+              style={{ fontFamily: "system-ui, sans-serif" }}
+            >
+              No listings match. Try a different filter, or be the first to list this mineral.
+            </div>
+          )}
+
+          {!loading &&
+            !error &&
+            visible.map((l) => (
+              <ListingCard
+                key={l.id}
+                listing={l}
+                isAdmin={isModerator}
+                isAuthenticated={Boolean(user)}
+                isSaved={savedListingIds.has(l.id)}
+                onToggleSave={toggleSaveListing}
+                onVerify={verifyListing}
+                onReject={rejectListing}
+                onSellerClick={onSellerClick}
+                onListingClick={onListingClick}
+              />
+            ))}
+        </div>
+
+        <ConsultingBanner />
+      </main>
+
+      {showAdd && (
+        <AddListingModal onClose={() => setShowAdd(false)} onAdd={addListing} />
+      )}
+    </div>
+  );
+}
