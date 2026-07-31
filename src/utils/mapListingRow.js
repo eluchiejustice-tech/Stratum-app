@@ -19,6 +19,7 @@ export function mapListingRow(row) {
     contact: row.seller_contact,
     verified: row.status === "verified",
     statusRaw: row.status,
+    listingState: row.listing_state,
     price: row.price,
     photoUrl: row.photo_url,
     strata: bandsFor(row.mineral),
