@@ -12,7 +12,7 @@ const LISTING_COLUMNS =
 // business-workflow rule, not a security rule — the DB does not enforce
 // transitions, only valid values — so this validation must run before every
 // listing_state write in the app.
-const LISTING_STATE_TRANSITIONS = {
+export const LISTING_STATE_TRANSITIONS = {
   active: ["paused", "sold", "archived"],
   paused: ["active", "sold", "archived"],
   sold: ["archived"],
