@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Ban } from "lucide-react";
 import ListingCard from "../components/ListingCard";
 import { mapListingRow } from "../utils/mapListingRow";
 import { getListingsBySeller } from "../services/listings";
 import { useAuthContext } from "../context/AuthContext";
 
-function StatusSection({ title, note, listings, onListingClick, onSellerClick }) {
+function StatusSection({ title, note, icon: Icon, listings, onListingClick, onSellerClick }) {
   if (listings.length === 0) return null;
 
   return (
     <div className="mb-8">
       <div
-        className="text-xs font-mono uppercase tracking-wide text-[#3D4148]/60 mb-1"
+        className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wide text-[#3D4148]/60 mb-1"
         style={{ fontFamily: "system-ui, sans-serif" }}
       >
+        {Icon && <Icon size={12} />}
         {title}
       </div>
       {note && (
@@ -124,7 +125,8 @@ export default function MyListingsPage({ onBack, onListingClick, onSellerClick }
             />
             <StatusSection
               title="Rejected"
-              note="These listings were not approved. You can submit a new listing or contact support if you need more information."
+              icon={Ban}
+              note="This listing did not meet our verification requirements and isn't visible in the marketplace. Contact support for details, then submit a new listing once you've made corrections."
               listings={rejected}
               onListingClick={onListingClick}
               onSellerClick={onSellerClick}
