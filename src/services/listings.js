@@ -95,6 +95,50 @@ export async function updateListingStatus(id, status) {
   return supabase.from("mineral_listings").update({ status }).eq("id", id);
 }
 
+export async function createVerificationRecord(record) {
+  return supabase.from("verification_records").insert(record);
+}
+
+// A moderator's decision ("verified" or "rejected") maps directly to
+// mineral_listings.status, which accepts both values. verification_records.status
+// has its own, narrower CHECK constraint (approved | rejected) — this map is the
+// single source of truth for that difference, so the mismatch can't be
+// reintroduced by a future caller writing "verified" directly into an audit record.
+const VERIFICATION_RECORD_STATUS = {
+  verified: "approved",
+  rejected: "rejected",
+};
+
+// Applies a moderator's verify/reject decision: updates mineral_listings.status
+// and writes the corresponding audit row to verification_records. Callers only
+// ever deal in business state ("verified"/"rejected") — the translation to
+// verification_records' own status vocabulary happens here and nowhere else.
+//
+// These are two independent Supabase calls (no multi-table transaction available
+// via supabase-js), so it's possible for the first to succeed and the second to
+// fail — callers must check the returned error and stage, not just assume
+// success once the function resolves.
+export async function setListingVerificationStatus(id, decision, moderatorId, notes = null) {
+  const { error: statusError } = await updateListingStatus(id, decision);
+  if (statusError) {
+    return { error: statusError, stage: "status_update" };
+  }
+
+  const { error: recordError } = await createVerificationRecord({
+    verification_type: "listing",
+    reference_id: id,
+    verified_by: moderatorId,
+    status: VERIFICATION_RECORD_STATUS[decision],
+    notes,
+  });
+
+  if (recordError) {
+    return { error: recordError, stage: "verification_record" };
+  }
+
+  return { error: null, stage: null };
+}
+
 // Transitions a listing's lifecycle state (active/paused/sold/archived).
 // Validates the transition against LISTING_STATE_TRANSITIONS before ever
 // reaching the database — invalid transitions are rejected locally with no
@@ -149,8 +193,4 @@ export async function updateListingState(id, newState) {
 // supported removal path from a listing's lifecycle.
 export async function deleteListing(id) {
   return supabase.from("mineral_listings").delete().eq("id", id).select();
-}
-
-export async function createVerificationRecord(record) {
-  return supabase.from("verification_records").insert(record);
 }
