@@ -15,8 +15,7 @@ import {
   createListing,
   createListingPhotos,
   createListingDocument,
-  updateListingStatus,
-  createVerificationRecord,
+  setListingVerificationStatus,
 } from "../services/listings";
 import { getSavedListings, saveListing, unsaveListing } from "../services/savedListings";
 
@@ -128,29 +127,17 @@ export default function MarketplacePage({ onSellerClick, onListingClick, onMyLis
   };
 
   const verifyListing = async (id) => {
-    const { error: updateError } = await updateListingStatus(id, "verified");
-    if (!updateError) {
-      await createVerificationRecord({
-        verification_type: "listing",
-        reference_id: id,
-        verified_by: user.id,
-        status: "verified",
-        notes: null,
-      });
+    const { error } = await setListingVerificationStatus(id, "verified", user.id);
+    if (error) {
+      console.error("Failed to verify listing", error);
     }
     await refresh();
   };
 
   const rejectListing = async (id) => {
-    const { error: updateError } = await updateListingStatus(id, "rejected");
-    if (!updateError) {
-      await createVerificationRecord({
-        verification_type: "listing",
-        reference_id: id,
-        verified_by: user.id,
-        status: "rejected",
-        notes: null,
-      });
+    const { error } = await setListingVerificationStatus(id, "rejected", user.id);
+    if (error) {
+      console.error("Failed to reject listing", error);
     }
     await refresh();
   };
