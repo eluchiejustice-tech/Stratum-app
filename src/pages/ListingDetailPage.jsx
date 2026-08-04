@@ -537,7 +537,7 @@ if (newState === "archived") {
                     onClick={rejectListing}
                     className="bg-[#8a3b3b] text-[#EDE8DC] text-xs font-mono uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition"
                   >
-                    Remove
+                    Reject
                   </button>
                 )}
                 {!user ? (
