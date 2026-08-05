@@ -126,18 +126,15 @@ export default function MarketplacePage({ onSellerClick, onListingClick, onMyLis
     await refresh();
   };
 
+  // Reject is intentionally not handled here. Rejection now requires a
+  // moderator to open the listing, review it, and provide feedback — it is
+  // a Listing Detail Page workflow, not a marketplace list action.
+  // ListingCard remains a lightweight summary component and no longer
+  // accepts an onReject handler.
   const verifyListing = async (id) => {
     const { error } = await setListingVerificationStatus(id, "verified", user.id);
     if (error) {
       console.error("Failed to verify listing", error);
-    }
-    await refresh();
-  };
-
-  const rejectListing = async (id) => {
-    const { error } = await setListingVerificationStatus(id, "rejected", user.id);
-    if (error) {
-      console.error("Failed to reject listing", error);
     }
     await refresh();
   };
@@ -282,7 +279,6 @@ export default function MarketplacePage({ onSellerClick, onListingClick, onMyLis
                 isSaved={savedListingIds.has(l.id)}
                 onToggleSave={toggleSaveListing}
                 onVerify={verifyListing}
-                onReject={rejectListing}
                 onSellerClick={onSellerClick}
                 onListingClick={onListingClick}
               />
