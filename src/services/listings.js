@@ -73,6 +73,12 @@ export async function createListingPhotos(listingId, photos) {
 // listing-documents bucket is private and access is via signed URLs.
 // Document verification is independent of listing status, so this always
 // starts as "pending" regardless of the listing's own approval state.
+//
+// Also used by ListingDetailPage's resubmit flow to attach a replacement
+// document to an already-existing (rejected) listing — this adds a new
+// mineral_documents row rather than replacing one in place. See the known
+// ordering ambiguity noted below on getSignedDocumentUrl-style lookups
+// once a listing can have more than one assay-report row.
 export async function createListingDocument(listingId, storagePath, uploadedBy) {
   return supabase.from("mineral_documents").insert({
     listing_id: listingId,
@@ -154,6 +160,20 @@ export async function getVerificationHistory(listingId) {
     .eq("verification_type", "listing")
     .eq("reference_id", listingId)
     .order("verified_at", { ascending: false });
+}
+
+// Moves a rejected listing back into the moderation queue, on the same
+// row, preserving its id and full verification_records history. Calls the
+// resubmit_listing() SECURITY DEFINER function, since sellers cannot
+// change mineral_listings.status directly via a normal update — RLS
+// blocks that by design (see the "owner cannot change status" UPDATE
+// policy). The function itself enforces ownership and that the listing is
+// currently 'rejected'; this wrapper just surfaces whatever error it
+// raises (e.g. wrong owner, wrong status) to the caller. Does not touch
+// verification_records or any resubmission log — this phase's only
+// responsibility is the status transition itself.
+export async function resubmitListing(id) {
+  return supabase.rpc("resubmit_listing", { p_listing_id: id });
 }
 
 // Transitions a listing's lifecycle state (active/paused/sold/archived).
