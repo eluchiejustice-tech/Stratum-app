@@ -6,17 +6,11 @@ const LISTING_COLUMNS =
   "created_at, seller_name, seller_contact, seller_company, " +
   "local_government_area, listing_state";
 
-// Valid listing_state values are enforced at the DB layer by a CHECK
-// constraint (active, paused, sold, archived). This map additionally
-// enforces which transitions between those values are allowed. This is a
-// business-workflow rule, not a security rule — the DB does not enforce
-// transitions, only valid values — so this validation must run before every
-// listing_state write in the app.
 export const LISTING_STATE_TRANSITIONS = {
   active: ["paused", "sold", "archived"],
   paused: ["active", "sold", "archived"],
   sold: ["archived"],
-  archived: [], // terminal state, no transitions out
+  archived: [],
 };
 
 export async function getListings() {
@@ -54,9 +48,58 @@ export async function createListing(listing) {
   return supabase.from("mineral_listings").insert(listing).select().single();
 }
 
-// Saves the seller's uploaded photos for a listing. Expects photos already
-// sorted by position (position 0 = cover). Only called after the listing
-// row itself has been created, since listing_id is a required FK.
+// Editable business fields for Edit Listing. This is a whitelist, not a
+// blacklist: only keys in this list are ever written, regardless of what
+// the caller passes. Deliberately excludes status, listing_state (both
+// have their own dedicated, validated transition functions elsewhere —
+// setListingVerificationStatus, resubmitListing, updateListingState), and
+// every identity/system column (id, seller_id, created_at). photo_url
+// (the cover-photo reference) is also excluded: Edit Listing in this
+// phase only supports adding photos, not changing the cover.
+//
+// mineral and category ARE included: no RLS rule, trigger, or business
+// rule makes a listing's mineral type immutable after creation — this
+// mirrors the same field pairing AddListingModal already writes at
+// creation time (category always equals mineral).
+const EDITABLE_LISTING_FIELDS = [
+  "mineral",
+  "category",
+  "description",
+  "quantity",
+  "mineral_grade",
+  "state",
+  "local_government_area",
+  "location",
+  "availability",
+  "price",
+  "seller_name",
+  "seller_company",
+  "seller_contact",
+];
+
+// Updates a listing's editable content fields only. Uses an explicit
+// whitelist (EDITABLE_LISTING_FIELDS) rather than stripping specific
+// disallowed keys — any field not on the list is silently dropped, so a
+// future caller can't accidentally introduce a new writable field just by
+// passing it in. `status`, `listing_state`, `id`, `seller_id`,
+// `created_at` can never be written through this function, even if
+// present in `fields`.
+export async function updateListingContent(id, fields) {
+  const safeFields = {};
+  for (const key of EDITABLE_LISTING_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(fields, key)) {
+      safeFields[key] = fields[key];
+    }
+  }
+
+  return supabase
+    .from("mineral_listings")
+    .update(safeFields)
+    .eq("id", id)
+    .select()
+    .single();
+}
+
 export async function createListingPhotos(listingId, photos) {
   const rows = photos.map((p) => ({
     listing_id: listingId,
@@ -66,19 +109,6 @@ export async function createListingPhotos(listingId, photos) {
   return supabase.from("listing_photos").insert(rows);
 }
 
-// Saves a reference to the seller's uploaded assay report/certificate for
-// a listing. Only called after the listing row itself has been created,
-// since listing_id is a required FK — same timing as createListingPhotos.
-// storagePath is the bucket-relative path (not a public URL), since the
-// listing-documents bucket is private and access is via signed URLs.
-// Document verification is independent of listing status, so this always
-// starts as "pending" regardless of the listing's own approval state.
-//
-// Also used by ListingDetailPage's resubmit flow to attach a replacement
-// document to an already-existing (rejected) listing — this adds a new
-// mineral_documents row rather than replacing one in place. See the known
-// ordering ambiguity noted below on getSignedDocumentUrl-style lookups
-// once a listing can have more than one assay-report row.
 export async function createListingDocument(listingId, storagePath, uploadedBy) {
   return supabase.from("mineral_documents").insert({
     listing_id: listingId,
@@ -105,25 +135,11 @@ export async function createVerificationRecord(record) {
   return supabase.from("verification_records").insert(record);
 }
 
-// A moderator's decision ("verified" or "rejected") maps directly to
-// mineral_listings.status, which accepts both values. verification_records.status
-// has its own, narrower CHECK constraint (approved | rejected) — this map is the
-// single source of truth for that difference, so the mismatch can't be
-// reintroduced by a future caller writing "verified" directly into an audit record.
 const VERIFICATION_RECORD_STATUS = {
   verified: "approved",
   rejected: "rejected",
 };
 
-// Applies a moderator's verify/reject decision: updates mineral_listings.status
-// and writes the corresponding audit row to verification_records. Callers only
-// ever deal in business state ("verified"/"rejected") — the translation to
-// verification_records' own status vocabulary happens here and nowhere else.
-//
-// These are two independent Supabase calls (no multi-table transaction available
-// via supabase-js), so it's possible for the first to succeed and the second to
-// fail — callers must check the returned error and stage, not just assume
-// success once the function resolves.
 export async function setListingVerificationStatus(id, decision, moderatorId, notes = null) {
   const { error: statusError } = await updateListingStatus(id, decision);
   if (statusError) {
@@ -145,14 +161,6 @@ export async function setListingVerificationStatus(id, decision, moderatorId, no
   return { error: null, stage: null };
 }
 
-// Returns the full chronological verification history for a listing —
-// every approve/reject action ever recorded, newest first. No filtering
-// or collapsing: repeated moderation events (e.g. reject → resubmit →
-// reject again) are shown in full, matching Stratum's audit-trail-as-
-// infrastructure principle. verified_by is deliberately not selected —
-// moderator identity stays internal; the DB still records it for
-// accountability, the UI simply doesn't surface it. RLS already restricts
-// this to the listing's owner or a moderator.
 export async function getVerificationHistory(listingId) {
   return supabase
     .from("verification_records")
@@ -162,33 +170,10 @@ export async function getVerificationHistory(listingId) {
     .order("verified_at", { ascending: false });
 }
 
-// Moves a rejected listing back into the moderation queue, on the same
-// row, preserving its id and full verification_records history. Calls the
-// resubmit_listing() SECURITY DEFINER function, since sellers cannot
-// change mineral_listings.status directly via a normal update — RLS
-// blocks that by design (see the "owner cannot change status" UPDATE
-// policy). The function itself enforces ownership and that the listing is
-// currently 'rejected'; this wrapper just surfaces whatever error it
-// raises (e.g. wrong owner, wrong status) to the caller. Does not touch
-// verification_records or any resubmission log — this phase's only
-// responsibility is the status transition itself.
 export async function resubmitListing(id) {
   return supabase.rpc("resubmit_listing", { p_listing_id: id });
 }
 
-// Transitions a listing's lifecycle state (active/paused/sold/archived).
-// Validates the transition against LISTING_STATE_TRANSITIONS before ever
-// reaching the database — invalid transitions are rejected locally with no
-// network call. Reads the current state from mineral_listings directly
-// (not the public view) so this works regardless of the listing's
-// verification status, matching the "sellers can view/manage own listings
-// regardless of status" RLS policy.
-//
-// A successful DB write still isn't guaranteed just because the transition
-// was valid: RLS silently returns zero rows (no thrown error) if the
-// listing isn't owned by the caller. Callers should check
-// `data` (null/undefined means denied or not found) rather than assuming
-// success just because no error was thrown.
 export async function updateListingState(id, newState) {
   const { data: current, error: fetchError } = await supabase
     .from("mineral_listings")
@@ -221,13 +206,6 @@ export async function updateListingState(id, newState) {
     .single();
 }
 
-// Attempts to hard-delete a listing. There is currently no DELETE policy
-// for any role on mineral_listings — not sellers, not moderators — so this
-// call is expected to be denied by RLS for everyone. It's included here so
-// the app has a single, honest entry point that mirrors real DB behaviour
-// (returns zero rows, no thrown error) rather than the UI assuming a hard
-// delete path exists. Archiving (via updateListingState) is the only
-// supported removal path from a listing's lifecycle.
 export async function deleteListing(id) {
   return supabase.from("mineral_listings").delete().eq("id", id).select();
 }
