@@ -1,4 +1,4 @@
-import { MapPin, Image as ImageIcon, MessageCircle, Phone, Mail, Check, Ban, Bookmark, BookmarkCheck } from "lucide-react";
+import { MapPin, Image as ImageIcon, MessageCircle, Phone, Mail, Check, Bookmark, BookmarkCheck } from "lucide-react";
 import CoreSample from "./CoreSample";
 import VerifiedBadge from "./VerifiedBadge";
 import { getContactOptions } from "../utils/contactHref";
@@ -16,7 +16,6 @@ export default function ListingCard({
   isSaved,
   onToggleSave,
   onVerify,
-  onReject,
   onSellerClick,
   onListingClick,
 }) {
@@ -106,15 +105,6 @@ export default function ListingCard({
                 className="flex items-center gap-1 bg-[#1F4D3D] text-[#EDE8DC] text-xs font-mono uppercase tracking-wide px-2.5 py-2 rounded hover:brightness-110 transition"
               >
                 <Check size={13} />
-              </button>
-            )}
-            {isAdmin && (
-              <button
-                onClick={() => onReject(l.id)}
-                title="Reject listing"
-                className="flex items-center gap-1 bg-[#8a3b3b] text-[#EDE8DC] text-xs font-mono uppercase tracking-wide px-2.5 py-2 rounded hover:brightness-110 transition"
-              >
-                <Ban size={13} />
               </button>
             )}
             {!isAuthenticated ? (
