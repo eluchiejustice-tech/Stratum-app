@@ -139,6 +139,23 @@ export async function setListingVerificationStatus(id, decision, moderatorId, no
   return { error: null, stage: null };
 }
 
+// Returns the full chronological verification history for a listing —
+// every approve/reject action ever recorded, newest first. No filtering
+// or collapsing: repeated moderation events (e.g. reject → resubmit →
+// reject again) are shown in full, matching Stratum's audit-trail-as-
+// infrastructure principle. verified_by is deliberately not selected —
+// moderator identity stays internal; the DB still records it for
+// accountability, the UI simply doesn't surface it. RLS already restricts
+// this to the listing's owner or a moderator.
+export async function getVerificationHistory(listingId) {
+  return supabase
+    .from("verification_records")
+    .select("id, status, notes, verified_at")
+    .eq("verification_type", "listing")
+    .eq("reference_id", listingId)
+    .order("verified_at", { ascending: false });
+}
+
 // Transitions a listing's lifecycle state (active/paused/sold/archived).
 // Validates the transition against LISTING_STATE_TRANSITIONS before ever
 // reaching the database — invalid transitions are rejected locally with no
