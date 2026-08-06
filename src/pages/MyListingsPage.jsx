@@ -40,7 +40,13 @@ function StatusSection({ title, note, icon: Icon, listings, onListingClick, onSe
   );
 }
 
-export default function MyListingsPage({ onBack, onListingClick, onSellerClick }) {
+// `embedded`: when true, this renders as a section inside another page
+// (SellerDashboardPage) rather than as its own standalone screen — the
+// "Back to marketplace" button and page heading are suppressed, since the
+// parent page already provides its own back navigation and heading.
+// Everything else (data loading, grouping, ListingCard rendering) is
+// identical in both modes.
+export default function MyListingsPage({ onBack, onListingClick, onSellerClick, embedded = false }) {
   const { user } = useAuthContext();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -75,19 +81,21 @@ export default function MyListingsPage({ onBack, onListingClick, onSellerClick }
 
   return (
     <div
-      className="min-h-screen bg-[#EDE8DC] text-[#15130F]"
-      style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+      className={embedded ? "" : "min-h-screen bg-[#EDE8DC] text-[#15130F]"}
+      style={embedded ? undefined : { fontFamily: "Georgia, 'Times New Roman', serif" }}
     >
-      <div className="max-w-4xl mx-auto px-5 sm:px-8 py-6">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wide text-[#3D4148]/70 hover:text-[#15130F] transition mb-6"
-          style={{ fontFamily: "system-ui, sans-serif" }}
-        >
-          <ArrowLeft size={14} /> Back to marketplace
-        </button>
+      <div className={embedded ? "" : "max-w-4xl mx-auto px-5 sm:px-8 py-6"}>
+        {!embedded && (
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wide text-[#3D4148]/70 hover:text-[#15130F] transition mb-6"
+            style={{ fontFamily: "system-ui, sans-serif" }}
+          >
+            <ArrowLeft size={14} /> Back to marketplace
+          </button>
+        )}
 
-        <h1 className="font-serif text-2xl mb-6">My listings</h1>
+        {!embedded && <h1 className="font-serif text-2xl mb-6">My listings</h1>}
 
         {loading && (
           <div className="text-center py-12 text-[#3D4148]/60">Loading your listings…</div>
