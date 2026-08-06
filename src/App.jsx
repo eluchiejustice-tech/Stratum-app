@@ -4,21 +4,10 @@ import SellerProfilePage from "./pages/SellerProfilePage";
 import ListingDetailPage from "./pages/ListingDetailPage";
 import MyListingsPage from "./pages/MyListingsPage";
 import BuyerDashboardPage from "./pages/BuyerDashboardPage";
+import SellerDashboardPage from "./pages/SellerDashboardPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { AuthProvider } from "./context/AuthContext";
 
-// This file intentionally stays thin. All marketplace logic still lives in
-// pages/MarketplacePage.jsx and the components/services it uses.
-//
-// State-based view switching (no react-router-dom yet). "view" tracks which
-// page is shown; "selectedSellerId" / "selectedListingId" carry whichever
-// entity the current detail view needs.
-//
-// "resetPassword" is a special case: unlike the other views, it's entered
-// via a URL query param (?view=reset-password) from a Supabase recovery
-// email link, not through in-app navigation — so it's detected once, at
-// initial mount, via the useState initializer below, rather than being
-// triggered by a setView() call elsewhere in the app.
 export default function App() {
   const [view, setView] = useState(() =>
     new URLSearchParams(window.location.search).get("view") === "reset-password"
@@ -38,12 +27,17 @@ export default function App() {
     setView("listingDetail");
   };
 
-  const openMyListings = () => {
-    setView("myListings");
-  };
-
   const openBuyerDashboard = () => {
     setView("buyerDashboard");
+  };
+
+  // Seller Dashboard is now the primary seller workspace — Listings
+  // Management lives inside it (via an embedded MyListingsPage), so
+  // MyListingsPage is no longer reachable as its own top-level view from
+  // Header. It remains importable/renderable in principle, but nothing
+  // currently sets view to "myListings".
+  const openSellerDashboard = () => {
+    setView("sellerDashboard");
   };
 
   const backToMarketplace = () => {
@@ -75,8 +69,8 @@ export default function App() {
           onBack={backToMarketplace}
           onSellerClick={openSellerProfile}
         />
-      ) : view === "myListings" ? (
-        <MyListingsPage
+      ) : view === "sellerDashboard" ? (
+        <SellerDashboardPage
           onBack={backToMarketplace}
           onListingClick={openListingDetail}
           onSellerClick={openSellerProfile}
@@ -91,7 +85,7 @@ export default function App() {
         <MarketplacePage
           onSellerClick={openSellerProfile}
           onListingClick={openListingDetail}
-          onMyListings={openMyListings}
+          onSellerDashboard={openSellerDashboard}
           onBuyerDashboard={openBuyerDashboard}
         />
       )}
