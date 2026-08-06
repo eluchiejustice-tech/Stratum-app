@@ -25,7 +25,7 @@ const UPLOAD_WARNING_MESSAGES = {
   both: "Your listing was created successfully, but some attachments could not be uploaded.",
 };
 
-export default function MarketplacePage({ onSellerClick, onListingClick, onMyListings, onBuyerDashboard }) {
+export default function MarketplacePage({ onSellerClick, onListingClick, onSellerDashboard, onBuyerDashboard }) {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -126,11 +126,6 @@ export default function MarketplacePage({ onSellerClick, onListingClick, onMyLis
     await refresh();
   };
 
-  // Reject is intentionally not handled here. Rejection now requires a
-  // moderator to open the listing, review it, and provide feedback — it is
-  // a Listing Detail Page workflow, not a marketplace list action.
-  // ListingCard remains a lightweight summary component and no longer
-  // accepts an onReject handler.
   const verifyListing = async (id) => {
     const { error } = await setListingVerificationStatus(id, "verified", user.id);
     if (error) {
@@ -162,10 +157,6 @@ export default function MarketplacePage({ onSellerClick, onListingClick, onMyLis
 
   const minerals = ["All", ...Object.keys(MINERAL_COLORS)];
 
-  // State/LGA are filtered against the raw Supabase rows (exact match on the
-  // real `state` / `local_government_area` columns) before mapping, since
-  // mapListingRow collapses those into a single display string. Mineral and
-  // free-text search continue to run on the mapped cards exactly as before.
   const visible = listings
     .filter((row) => {
       const matchesState = !stateFilter || row.state === stateFilter;
@@ -190,7 +181,7 @@ export default function MarketplacePage({ onSellerClick, onListingClick, onMyLis
     >
       <Header
         onAddListing={openAddListing}
-        onMyListings={onMyListings}
+        onSellerDashboard={onSellerDashboard}
         onBuyerDashboard={onBuyerDashboard}
       />
 
