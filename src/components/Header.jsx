@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Layers, Plus, Lock, Shield, LogOut, UserCog, ClipboardList, LayoutDashboard } from "lucide-react";
+import { Layers, Plus, Lock, Shield, LogOut, UserCog, LayoutDashboard } from "lucide-react";
 import { useAuthContext } from "../context/AuthContext";
 import { signOut } from "../services/auth";
 import LoginForm from "./LoginForm";
@@ -7,7 +7,12 @@ import EditProfileModal from "./EditProfileModal";
 
 const LISTING_ROLES = ["miner_supplier", "company", "professional", "mineral_agent", "moderator"];
 
-export default function Header({ onAddListing, onMyListings, onBuyerDashboard }) {
+// "My dashboard" is role-aware: sellers (canCreateListings) land on
+// SellerDashboardPage, which is now their single operational hub —
+// Listings Management lives inside it, so the separate "My listings"
+// button has been removed to avoid two navigation paths to the same
+// content. Everyone else continues to BuyerDashboardPage, unchanged.
+export default function Header({ onAddListing, onSellerDashboard, onBuyerDashboard }) {
   const { user, profile, role, loading, refreshProfile } = useAuthContext();
   const [showLogin, setShowLogin] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -45,23 +50,12 @@ export default function Header({ onAddListing, onMyListings, onBuyerDashboard })
 
             {!loading && user && (
               <button
-                onClick={onBuyerDashboard}
+                onClick={canCreateListings ? onSellerDashboard : onBuyerDashboard}
                 title="My dashboard"
                 className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-wide px-3 py-2 rounded bg-transparent text-[#EDE8DC]/70 border border-[#EDE8DC]/30 hover:brightness-110 transition"
               >
                 <LayoutDashboard size={14} />
                 My dashboard
-              </button>
-            )}
-
-            {!loading && user && canCreateListings && (
-              <button
-                onClick={onMyListings}
-                title="My listings"
-                className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-wide px-3 py-2 rounded bg-transparent text-[#EDE8DC]/70 border border-[#EDE8DC]/30 hover:brightness-110 transition"
-              >
-                <ClipboardList size={14} />
-                My listings
               </button>
             )}
 
