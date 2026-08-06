@@ -58,7 +58,7 @@ export default function ListingCard({
                 {isSaved ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
               </button>
             )}
-            <VerifiedBadge verified={l.verified} />
+            <VerifiedBadge status={l.statusRaw} />
           </div>
         </div>
         <div
