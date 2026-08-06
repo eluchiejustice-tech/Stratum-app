@@ -48,19 +48,6 @@ export async function createListing(listing) {
   return supabase.from("mineral_listings").insert(listing).select().single();
 }
 
-// Editable business fields for Edit Listing. This is a whitelist, not a
-// blacklist: only keys in this list are ever written, regardless of what
-// the caller passes. Deliberately excludes status, listing_state (both
-// have their own dedicated, validated transition functions elsewhere —
-// setListingVerificationStatus, resubmitListing, updateListingState), and
-// every identity/system column (id, seller_id, created_at). photo_url
-// (the cover-photo reference) is also excluded: Edit Listing in this
-// phase only supports adding photos, not changing the cover.
-//
-// mineral and category ARE included: no RLS rule, trigger, or business
-// rule makes a listing's mineral type immutable after creation — this
-// mirrors the same field pairing AddListingModal already writes at
-// creation time (category always equals mineral).
 const EDITABLE_LISTING_FIELDS = [
   "mineral",
   "category",
@@ -77,13 +64,6 @@ const EDITABLE_LISTING_FIELDS = [
   "seller_contact",
 ];
 
-// Updates a listing's editable content fields only. Uses an explicit
-// whitelist (EDITABLE_LISTING_FIELDS) rather than stripping specific
-// disallowed keys — any field not on the list is silently dropped, so a
-// future caller can't accidentally introduce a new writable field just by
-// passing it in. `status`, `listing_state`, `id`, `seller_id`,
-// `created_at` can never be written through this function, even if
-// present in `fields`.
 export async function updateListingContent(id, fields) {
   const safeFields = {};
   for (const key of EDITABLE_LISTING_FIELDS) {
@@ -208,4 +188,124 @@ export async function updateListingState(id, newState) {
 
 export async function deleteListing(id) {
   return supabase.from("mineral_listings").delete().eq("id", id).select();
+}
+
+// ---- Seller Dashboard support functions (Phase 6) ----
+
+// Lightweight status counts for dashboard summary cards. Four count-only
+// queries (head: true, no rows returned) rather than one full-row fetch —
+// cost stays flat regardless of whether a seller has 5 or 5,000 listings,
+// directly addressing the scalability issue found in MyListingsPage.
+export async function getListingCountsBySeller(sellerId) {
+  const statuses = ["pending", "verified", "rejected"];
+  const results = await Promise.all(
+    statuses.map((status) =>
+      supabase
+        .from("mineral_listings")
+        .select("*", { count: "exact", head: true })
+        .eq("seller_id", sellerId)
+        .eq("status", status)
+    )
+  );
+
+  const firstError = results.find((r) => r.error)?.error || null;
+  if (firstError) return { data: null, error: firstError };
+
+  const [pendingRes, verifiedRes, rejectedRes] = results;
+  const pending = pendingRes.count || 0;
+  const verified = verifiedRes.count || 0;
+  const rejected = rejectedRes.count || 0;
+
+  return {
+    data: { pending, verified, rejected, total: pending + verified + rejected },
+    error: null,
+  };
+}
+
+// Same count-only pattern, for the Listing Lifecycle overview.
+export async function getListingStateCountsBySeller(sellerId) {
+  const states = ["active", "paused", "sold", "archived"];
+  const results = await Promise.all(
+    states.map((state) =>
+      supabase
+        .from("mineral_listings")
+        .select("*", { count: "exact", head: true })
+        .eq("seller_id", sellerId)
+        .eq("listing_state", state)
+    )
+  );
+
+  const firstError = results.find((r) => r.error)?.error || null;
+  if (firstError) return { data: null, error: firstError };
+
+  const [activeRes, pausedRes, soldRes, archivedRes] = results;
+  return {
+    data: {
+      active: activeRes.count || 0,
+      paused: pausedRes.count || 0,
+      sold: soldRes.count || 0,
+      archived: archivedRes.count || 0,
+    },
+    error: null,
+  };
+}
+
+// Selects only id, mineral, status — not the full ~20-column row. Powers
+// the "Needs Attention" rejected-listings list and the seller's
+// most-listed mineral (for Market Intelligence).
+export async function getListingIdentifiersBySeller(sellerId) {
+  return supabase
+    .from("mineral_listings")
+    .select("id, mineral, status")
+    .eq("seller_id", sellerId)
+    .order("created_at", { ascending: false });
+}
+
+// Seller-scoped moderation feed: the most recent verification_records
+// across ALL of this seller's listings, not per-listing like
+// ListingHistory. reference_id has no real FK to mineral_listings (it's
+// polymorphic across verification_type), so this is a two-step lookup,
+// not a join: first this seller's listing ids+names, then records
+// restricted to those ids. Mineral name is merged back in afterward.
+export async function getRecentModerationActivity(sellerId, limit = 5) {
+  const { data: listings, error: listErr } = await supabase
+    .from("mineral_listings")
+    .select("id, mineral")
+    .eq("seller_id", sellerId);
+
+  if (listErr) return { data: null, error: listErr };
+  if (!listings || listings.length === 0) return { data: [], error: null };
+
+  const idToMineral = Object.fromEntries(listings.map((l) => [l.id, l.mineral]));
+  const ids = listings.map((l) => l.id);
+
+  const { data: records, error: recErr } = await supabase
+    .from("verification_records")
+    .select("id, status, notes, verified_at, reference_id")
+    .eq("verification_type", "listing")
+    .in("reference_id", ids)
+    .order("verified_at", { ascending: false })
+    .limit(limit);
+
+  if (recErr) return { data: null, error: recErr };
+
+  const merged = records.map((r) => ({
+    ...r,
+    mineral: idToMineral[r.reference_id] || "Unknown listing",
+  }));
+
+  return { data: merged, error: null };
+}
+
+// Market Intelligence, deliberately minimal per product decision: a
+// marketplace-wide count of verified listings for one mineral. No price
+// data involved — sidesteps the free-text price field entirely. Reads
+// from mineral_listings_public, matching every other marketplace-wide
+// read in this app.
+export async function getVerifiedListingCountForMineral(mineral) {
+  return supabase
+    .from("mineral_listings_public")
+    .select("*", { count: "exact", head: true })
+    .eq("mineral", mineral)
+    .eq("status", "verified");
 }
