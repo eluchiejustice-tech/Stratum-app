@@ -6,10 +6,10 @@ import {
   Ban,
   Check,
   Layers,
-  TrendingUp,
   Plus,
 } from "lucide-react";
 import MyListingsPage from "./MyListingsPage";
+import MarketSnapshotSection from "../components/intelligence/MarketSnapshotSection";
 import AddListingModal from "../components/AddListingModal";
 import { useAuthContext } from "../context/AuthContext";
 import { getProfileById } from "../services/profiles";
@@ -18,7 +18,6 @@ import {
   getListingStateCountsBySeller,
   getListingIdentifiersBySeller,
   getRecentModerationActivity,
-  getVerifiedListingCountForMineral,
   createListing,
   createListingPhotos,
   createListingDocument,
@@ -39,19 +38,6 @@ function computeProfileCompletion(profile) {
   return Math.round((filled / PROFILE_COMPLETION_FIELDS.length) * 100);
 }
 
-function mostListedMineral(identifiers) {
-  if (!identifiers || identifiers.length === 0) return null;
-  const counts = {};
-  for (const { mineral } of identifiers) {
-    counts[mineral] = (counts[mineral] || 0) + 1;
-  }
-  let best = null;
-  for (const [mineral, count] of Object.entries(counts)) {
-    if (!best || count > best.count) best = { mineral, count };
-  }
-  return best;
-}
-
 function formatDate(isoString) {
   const date = new Date(isoString);
   if (isNaN(date.getTime())) return "";
@@ -62,7 +48,7 @@ function formatDate(isoString) {
   });
 }
 
-export default function SellerDashboardPage({ onBack, onListingClick, onSellerClick }) {
+export default function SellerDashboardPage({ onBack, onListingClick, onSellerClick, onMarketIntelligence }) {
   const { user } = useAuthContext();
 
   const [loading, setLoading] = useState(true);
@@ -73,7 +59,6 @@ export default function SellerDashboardPage({ onBack, onListingClick, onSellerCl
   const [identifiers, setIdentifiers] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
   const [profile, setProfile] = useState(null);
-  const [marketIntel, setMarketIntel] = useState(null);
 
   const [showAdd, setShowAdd] = useState(false);
   const [uploadWarning, setUploadWarning] = useState(null);
@@ -114,23 +99,6 @@ export default function SellerDashboardPage({ onBack, onListingClick, onSellerCl
     setIdentifiers(identifiersRes.data || []);
     setRecentActivity(activityRes.data || []);
     setProfile(profileRes.data);
-
-    // Market Intelligence is a second-stage call: it depends on knowing
-    // the seller's most-listed mineral first, which only exists once
-    // identifiers have loaded. Skipped entirely if the seller has no
-    // listings yet — there is nothing honest to report in that case.
-    const top = mostListedMineral(identifiersRes.data || []);
-    if (top) {
-      const { count, error: intelError } = await getVerifiedListingCountForMineral(top.mineral);
-      if (intelError) {
-        console.error("Failed to load market intelligence", intelError);
-        setMarketIntel(null);
-      } else {
-        setMarketIntel({ mineral: top.mineral, verifiedCount: count || 0 });
-      }
-    } else {
-      setMarketIntel(null);
-    }
 
     setLoading(false);
   }, [user]);
@@ -347,19 +315,10 @@ export default function SellerDashboardPage({ onBack, onListingClick, onSellerCl
               </div>
             )}
 
-            {/* Market Intelligence — deliberately minimal */}
-            {marketIntel && (
-              <div className="bg-white rounded-lg p-5 shadow-sm border border-[#3D4148]/10 mb-6">
-                <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-2">
-                  <TrendingUp size={12} /> Market intelligence
-                </div>
-                <p className="text-sm" style={{ fontFamily: "system-ui, sans-serif" }}>
-                  Your most-listed mineral, <strong>{marketIntel.mineral}</strong>, currently has{" "}
-                  <strong>{marketIntel.verifiedCount}</strong> verified listing
-                  {marketIntel.verifiedCount === 1 ? "" : "s"} in the marketplace.
-                </p>
-              </div>
-            )}
+            {/* Market Snapshot — Phase 7. Concise summary only; the full
+                Market Intelligence experience lives on its own page,
+                reachable from here and from Header. */}
+            <MarketSnapshotSection onViewFull={onMarketIntelligence} />
 
             {/* Recent Moderation Activity */}
             <div className="bg-white rounded-lg p-5 shadow-sm border border-[#3D4148]/10 mb-6">
