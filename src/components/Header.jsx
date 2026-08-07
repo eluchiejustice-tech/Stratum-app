@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Layers, Plus, Lock, Shield, LogOut, UserCog, LayoutDashboard } from "lucide-react";
+import { Layers, Plus, Lock, Shield, LogOut, UserCog, LayoutDashboard, TrendingUp } from "lucide-react";
 import { useAuthContext } from "../context/AuthContext";
 import { signOut } from "../services/auth";
 import LoginForm from "./LoginForm";
@@ -12,7 +12,11 @@ const LISTING_ROLES = ["miner_supplier", "company", "professional", "mineral_age
 // Listings Management lives inside it, so the separate "My listings"
 // button has been removed to avoid two navigation paths to the same
 // content. Everyone else continues to BuyerDashboardPage, unchanged.
-export default function Header({ onAddListing, onSellerDashboard, onBuyerDashboard }) {
+//
+// "Market Intelligence" (Phase 7) is deliberately NOT gated behind
+// !loading && user — it's a public, evidence-backed destination meant
+// for anonymous visitors, buyers, sellers, and moderators alike.
+export default function Header({ onAddListing, onSellerDashboard, onBuyerDashboard, onMarketIntelligence }) {
   const { user, profile, role, loading, refreshProfile } = useAuthContext();
   const [showLogin, setShowLogin] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -46,6 +50,17 @@ export default function Header({ onAddListing, onSellerDashboard, onBuyerDashboa
               >
                 <Shield size={14} />
               </div>
+            )}
+
+            {onMarketIntelligence && (
+              <button
+                onClick={onMarketIntelligence}
+                title="Market Intelligence"
+                className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-wide px-3 py-2 rounded bg-transparent text-[#EDE8DC]/70 border border-[#EDE8DC]/30 hover:brightness-110 transition"
+              >
+                <TrendingUp size={14} />
+                Market Intelligence
+              </button>
             )}
 
             {!loading && user && (
@@ -105,10 +120,7 @@ export default function Header({ onAddListing, onSellerDashboard, onBuyerDashboa
       </header>
 
       {showLogin && (
-        <LoginForm
-          onClose={() => setShowLogin(false)}
-          onSuccess={() => setShowLogin(false)}
-        />
+        <LoginForm onClose={() => setShowLogin(false)} onSuccess={() => setShowLogin(false)} />
       )}
 
       {showEditProfile && user && (
