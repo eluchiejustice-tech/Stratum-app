@@ -25,7 +25,13 @@ const UPLOAD_WARNING_MESSAGES = {
   both: "Your listing was created successfully, but some attachments could not be uploaded.",
 };
 
-export default function MarketplacePage({ onSellerClick, onListingClick, onSellerDashboard, onBuyerDashboard }) {
+export default function MarketplacePage({
+  onSellerClick,
+  onListingClick,
+  onSellerDashboard,
+  onBuyerDashboard,
+  onMarketIntelligence,
+}) {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -183,6 +189,7 @@ export default function MarketplacePage({ onSellerClick, onListingClick, onSelle
         onAddListing={openAddListing}
         onSellerDashboard={onSellerDashboard}
         onBuyerDashboard={onBuyerDashboard}
+        onMarketIntelligence={onMarketIntelligence}
       />
 
       <main className="max-w-4xl mx-auto px-5 sm:px-8 py-6">
