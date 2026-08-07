@@ -5,6 +5,7 @@ import ListingDetailPage from "./pages/ListingDetailPage";
 import MyListingsPage from "./pages/MyListingsPage";
 import BuyerDashboardPage from "./pages/BuyerDashboardPage";
 import SellerDashboardPage from "./pages/SellerDashboardPage";
+import MarketIntelligencePage from "./pages/MarketIntelligencePage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { AuthProvider } from "./context/AuthContext";
 
@@ -38,6 +39,13 @@ export default function App() {
   // currently sets view to "myListings".
   const openSellerDashboard = () => {
     setView("sellerDashboard");
+  };
+
+  // Market Intelligence (Phase 7) — a first-class, public destination.
+  // Reachable from Header (always visible, regardless of auth state) and
+  // from Seller Dashboard's Market Snapshot "view full experience" link.
+  const openMarketIntelligence = () => {
+    setView("marketIntelligence");
   };
 
   const backToMarketplace = () => {
@@ -74,6 +82,7 @@ export default function App() {
           onBack={backToMarketplace}
           onListingClick={openListingDetail}
           onSellerClick={openSellerProfile}
+          onMarketIntelligence={openMarketIntelligence}
         />
       ) : view === "buyerDashboard" ? (
         <BuyerDashboardPage
@@ -81,12 +90,15 @@ export default function App() {
           onListingClick={openListingDetail}
           onSellerClick={openSellerProfile}
         />
+      ) : view === "marketIntelligence" ? (
+        <MarketIntelligencePage onBack={backToMarketplace} />
       ) : (
         <MarketplacePage
           onSellerClick={openSellerProfile}
           onListingClick={openListingDetail}
           onSellerDashboard={openSellerDashboard}
           onBuyerDashboard={openBuyerDashboard}
+          onMarketIntelligence={openMarketIntelligence}
         />
       )}
     </AuthProvider>
