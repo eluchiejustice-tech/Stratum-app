@@ -2,6 +2,7 @@ import { MapPin, Image as ImageIcon, MessageCircle, Phone, Mail, Check, Bookmark
 import CoreSample from "./CoreSample";
 import VerifiedBadge from "./VerifiedBadge";
 import { getContactOptions } from "../utils/contactHref";
+import { logContactSellerClick } from "../services/buyerInterest";
 
 const CONTACT_ICONS = {
   call: Phone,
@@ -120,6 +121,7 @@ export default function ListingCard({
                     href={opt.href}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => logContactSellerClick(l.id, opt.type)}
                     className="flex items-center gap-1.5 bg-[#1F4D3D] text-[#EDE8DC] text-xs font-mono uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition"
                   >
                     <Icon size={13} /> {opt.label}
