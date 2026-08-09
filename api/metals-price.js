@@ -244,7 +244,7 @@ async function fetchMetalsPrices(symbols, fetchImpl = fetch) {
  * Adapter-only: fetches, parses, normalizes, and returns. Performs no
  * database writes of any kind.
  */
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   const symbolsParam = req.query?.symbols;
   const symbols = symbolsParam
     ? String(symbolsParam)
@@ -268,13 +268,15 @@ module.exports = async function handler(req, res) {
     // Never leak raw provider responses or the API key in error output.
     res.status(502).json({ success: false, error: message });
   }
-};
+}
 
 // Named exports for isolated unit testing.
-module.exports.normalizeSymbolPrice = normalizeSymbolPrice;
-module.exports.parseProviderResponse = parseProviderResponse;
-module.exports.isPlausibleGoldPrice = isPlausibleGoldPrice;
-module.exports.fetchMetalsPrices = fetchMetalsPrices;
-module.exports.MetalsApiAdapterError = MetalsApiAdapterError;
-module.exports.SUPPORTED_SYMBOLS = SUPPORTED_SYMBOLS;
-module.exports.LME_CONVERSION_FACTOR = LME_CONVERSION_FACTOR;
+export {
+  normalizeSymbolPrice,
+  parseProviderResponse,
+  isPlausibleGoldPrice,
+  fetchMetalsPrices,
+  MetalsApiAdapterError,
+  SUPPORTED_SYMBOLS,
+  LME_CONVERSION_FACTOR,
+};
