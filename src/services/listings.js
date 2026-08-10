@@ -89,6 +89,49 @@ export async function createListingPhotos(listingId, photos) {
   return supabase.from("listing_photos").insert(rows);
 }
 
+// Deletes one existing listing photo: the DB row first (RLS already
+// restricts this to the owning seller via the listing_photos DELETE
+// policy), then the corresponding storage object. If the id doesn't
+// belong to the caller's own listing, the DELETE matches 0 rows with no
+// Postgres error, which we surface as "not_authorized" below rather than
+// proceeding to touch storage. If the DB delete succeeds but the storage
+// cleanup fails, the photo is still correctly removed from the listing —
+// the leftover storage file just joins the existing small set of
+// pre-existing orphaned files, a separate known/deferred cleanup item.
+export async function deleteListingPhoto(photo) {
+  const { data, error: dbError } = await supabase
+    .from("listing_photos")
+    .delete()
+    .eq("id", photo.id)
+    .select();
+
+  if (dbError) {
+    console.error("Failed to delete listing_photos row", dbError);
+    return { error: dbError, stage: "db_delete" };
+  }
+
+  if (!data || data.length === 0) {
+    return {
+      error: { message: "Photo not found or not owned by you." },
+      stage: "not_authorized",
+    };
+  }
+
+  const storagePath = photo.photo_url.split("/listing-photos/")[1];
+  if (storagePath) {
+    const { error: storageError } = await supabase.storage
+      .from("listing-photos")
+      .remove([storagePath]);
+
+    if (storageError) {
+      console.error("Photo row deleted but storage cleanup failed", storageError);
+      return { error: storageError, stage: "storage_delete" };
+    }
+  }
+
+  return { error: null, stage: null };
+}
+
 export async function createListingDocument(listingId, storagePath, uploadedBy) {
   return supabase.from("mineral_documents").insert({
     listing_id: listingId,
