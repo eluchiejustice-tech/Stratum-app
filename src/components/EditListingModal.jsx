@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import { supabase } from "../services/supabaseClient";
 import { AFRICA_LOCATIONS } from "../data/africaLocations";
 import { MINERAL_COLORS } from "../utils/mineralColors";
-import { updateListingContent, createListingPhotos, createListingDocument } from "../services/listings";
+import { updateListingContent, createListingPhotos, createListingDocument, deleteListingPhoto } from "../services/listings";
 
 const QUANTITY_UNITS = ["kg", "g", "tonnes", "tons", "lb", "oz"];
 const MAX_PHOTOS = 5;
@@ -50,7 +50,7 @@ function getPriceWarning(price) {
 }
 
 // Validates editable fields. Deliberately does not require a fresh photo
-// upload the way AddListingModal's validate() does — existingPhotoCount
+// upload the way AddListingModal's validate() does — existingPhotos
 // (passed in) already guarantees at least one photo exists before Edit
 // Listing is ever reachable for a given listing.
 function validate(form, customMineral) {
@@ -84,9 +84,10 @@ function validate(form, customMineral) {
 
 // listing: the already-loaded, mapped listing object from
 // ListingDetailPage (via mapListingRow) — no separate fetch happens here.
-// existingPhotoCount: how many photos already exist, so the add-photo
-// limit accounts for them without needing to load or duplicate them here.
-export default function EditListingModal({ listing, existingPhotoCount, onClose, onSaved }) {
+// existingPhotos: the listing's current listing_photos rows ({ id,
+// photo_url, position }), passed in from ListingDetailPage so this modal
+// can both display them and delete them without a separate fetch here.
+export default function EditListingModal({ listing, existingPhotos, onClose, onSaved }) {
   const parsedQuantity = parseQuantity(listing.quantity);
   const startingMineralIsKnown = isKnownMineral(listing.mineral);
 
@@ -110,6 +111,8 @@ export default function EditListingModal({ listing, existingPhotoCount, onClose,
   const [errors, setErrors] = useState({});
   const [priceWarning, setPriceWarning] = useState(null);
 
+  const [photos, setPhotos] = useState(existingPhotos || []);
+  const [deletingPhotoId, setDeletingPhotoId] = useState(null);
   const [newPhotos, setNewPhotos] = useState([]);
   const [photoError, setPhotoError] = useState("");
 
@@ -137,8 +140,7 @@ export default function EditListingModal({ listing, existingPhotoCount, onClose,
 
   // Uploads a new photo immediately (same mechanics as AddListingModal:
   // same bucket, same filename convention) and attaches it to the
-  // existing listing right away via createListingPhotos. Photo deletion
-  // is out of scope for this phase — existing photos are always kept.
+  // existing listing right away via createListingPhotos.
   const uploadNewPhoto = async (file, position) => {
     const fileExt = file.name.split(".").pop();
     const storagePath = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
@@ -182,7 +184,7 @@ export default function EditListingModal({ listing, existingPhotoCount, onClose,
     e.target.value = "";
     if (files.length === 0) return;
 
-    const currentTotal = existingPhotoCount + newPhotos.length;
+    const currentTotal = photos.length + newPhotos.length;
     const availableSlots = MAX_PHOTOS - currentTotal;
 
     if (availableSlots <= 0) {
@@ -204,6 +206,31 @@ export default function EditListingModal({ listing, existingPhotoCount, onClose,
       uploadNewPhoto(file, nextPosition);
       nextPosition += 1;
     });
+  };
+
+  // Deletes an existing (already-saved) listing photo. Ownership is
+  // enforced by RLS/storage policy server-side, not just by this button
+  // being hidden from non-owners — see deleteListingPhoto() in the
+  // service layer for the exact authorization/failure handling.
+  const handleDeleteExistingPhoto = async (photo) => {
+    setDeletingPhotoId(photo.id);
+    setPhotoError("");
+
+    const { error, stage } = await deleteListingPhoto(photo);
+
+    if (error) {
+      console.error("Failed to delete photo", stage, error);
+      setPhotoError(
+        stage === "not_authorized"
+          ? "Couldn't delete that photo."
+          : "Couldn't delete that photo. Please try again."
+      );
+      setDeletingPhotoId(null);
+      return;
+    }
+
+    setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
+    setDeletingPhotoId(null);
   };
 
   // Same pattern as Phase 4's handleReplaceDocument: uploads immediately
@@ -466,15 +493,38 @@ export default function EditListingModal({ listing, existingPhotoCount, onClose,
 
           <div>
             <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">
-              Add photos (existing photos are kept; up to {MAX_PHOTOS} total)
+              Photos (up to {MAX_PHOTOS} total)
             </label>
+
+            {photos.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-1">
+                {photos.map((p) => (
+                  <div
+                    key={p.id}
+                    className="relative w-16 h-16 rounded border border-[#3D4148]/20 overflow-hidden bg-white"
+                  >
+                    <img src={p.photo_url} alt="Listing photo" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteExistingPhoto(p)}
+                      disabled={deletingPhotoId === p.id}
+                      className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5 hover:bg-black/80 disabled:opacity-50"
+                      aria-label="Remove photo"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <input
               type="file"
               accept="image/*"
               multiple
               onChange={handlePhotosChange}
-              disabled={existingPhotoCount + newPhotos.length >= MAX_PHOTOS}
-              className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm disabled:opacity-50"
+              disabled={photos.length + newPhotos.length >= MAX_PHOTOS}
+              className="w-full mt-2 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm disabled:opacity-50"
             />
             {photoError && (
               <p className="text-sm font-medium text-[#8a3b3b] bg-[#8a3b3b]/10 border border-[#8a3b3b]/30 rounded px-3 py-2 mt-2">
