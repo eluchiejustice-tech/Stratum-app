@@ -6,6 +6,8 @@ import MyListingsPage from "./pages/MyListingsPage";
 import BuyerDashboardPage from "./pages/BuyerDashboardPage";
 import SellerDashboardPage from "./pages/SellerDashboardPage";
 import MarketIntelligencePage from "./pages/MarketIntelligencePage";
+import SellerInquiriesPage from "./pages/SellerInquiriesPage";
+import BuyerInquiriesPage from "./pages/BuyerInquiriesPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { AuthProvider } from "./context/AuthContext";
 
@@ -48,6 +50,18 @@ export default function App() {
     setView("marketIntelligence");
   };
 
+  // Buyer Interest & Deal Workflow — each side's inquiry inbox is its own
+  // top-level view, reachable from its respective dashboard, following
+  // the same link-out pattern as openMarketIntelligence rather than being
+  // embedded inline in either dashboard.
+  const openSellerInquiries = () => {
+    setView("sellerInquiries");
+  };
+
+  const openBuyerInquiries = () => {
+    setView("buyerInquiries");
+  };
+
   const backToMarketplace = () => {
     setView("marketplace");
     setSelectedSellerId(null);
@@ -83,15 +97,28 @@ export default function App() {
           onListingClick={openListingDetail}
           onSellerClick={openSellerProfile}
           onMarketIntelligence={openMarketIntelligence}
+          onSellerInquiries={openSellerInquiries}
         />
       ) : view === "buyerDashboard" ? (
         <BuyerDashboardPage
           onBack={backToMarketplace}
           onListingClick={openListingDetail}
           onSellerClick={openSellerProfile}
+          onBuyerInquiries={openBuyerInquiries}
         />
       ) : view === "marketIntelligence" ? (
         <MarketIntelligencePage onBack={backToMarketplace} />
+      ) : view === "sellerInquiries" ? (
+        <SellerInquiriesPage
+          onBack={backToMarketplace}
+          onListingClick={openListingDetail}
+        />
+      ) : view === "buyerInquiries" ? (
+        <BuyerInquiriesPage
+          onBack={backToMarketplace}
+          onListingClick={openListingDetail}
+          onSellerClick={openSellerProfile}
+        />
       ) : (
         <MarketplacePage
           onSellerClick={openSellerProfile}
