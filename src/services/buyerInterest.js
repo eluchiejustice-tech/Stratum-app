@@ -54,3 +54,43 @@ export async function logContactSellerClick(listingId, contactMethod) {
     console.error("Failed to log contact click", err);
   }
 }
+
+// ---- Buyer Interest & Deal Workflow ----
+// Unlike the two analytics functions above (fire-and-forget, errors only
+// logged), these are user-facing actions — callers need to know whether
+// they succeeded, so they follow the { data, error } convention used
+// throughout listings.js instead. buyer_id/seller_id are never sent from
+// here: both create_buyer_interest and update_buyer_interest_status
+// derive them server-side, matching the DB-level authorization design.
+
+export async function createBuyerInterest(listingId, { requestedQuantity, buyerMessage, offerPrice } = {}) {
+  return supabase.rpc("create_buyer_interest", {
+    p_listing_id: listingId,
+    p_requested_quantity: requestedQuantity ?? null,
+    p_buyer_message: buyerMessage ?? null,
+    p_offer_price: offerPrice ?? null,
+  });
+}
+
+export async function updateBuyerInterestStatus(interestId, newStatus) {
+  return supabase.rpc("update_buyer_interest_status", {
+    p_interest_id: interestId,
+    p_new_status: newStatus,
+  });
+}
+
+export async function getSellerInquiries(sellerId) {
+  return supabase
+    .from("buyer_interests")
+    .select("*")
+    .eq("seller_id", sellerId)
+    .order("created_at", { ascending: false });
+}
+
+export async function getBuyerInquiries(buyerId) {
+  return supabase
+    .from("buyer_interests")
+    .select("*")
+    .eq("buyer_id", buyerId)
+    .order("created_at", { ascending: false });
+}
