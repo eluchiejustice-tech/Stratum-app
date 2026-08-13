@@ -17,6 +17,7 @@ const STATUS_LABELS = {
   accepted: "Accepted",
   declined: "Declined",
   closed: "Closed",
+  withdrawn: "Withdrawn",
 };
 
 const STATUS_COLORS = {
@@ -26,6 +27,7 @@ const STATUS_COLORS = {
   accepted: "bg-[#1F4D3D]/10 text-[#1F4D3D]",
   declined: "bg-[#8a3b3b]/10 text-[#8a3b3b]",
   closed: "bg-[#3D4148]/10 text-[#3D4148]/60",
+  withdrawn: "bg-[#3D4148]/10 text-[#3D4148]/60",
 };
 
 function formatDate(isoString) {
