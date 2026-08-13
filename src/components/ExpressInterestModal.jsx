@@ -2,6 +2,21 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { createBuyerInterest } from "../services/buyerInterest";
 
+// Known, intentional business-rule messages raised by create_buyer_interest
+// (see services/buyerInterest.js / the RPC itself). Only these exact
+// messages are ever shown to the user — anything else (network failures,
+// unexpected/technical errors) falls back to the generic message below,
+// so we never risk exposing a raw Postgres/technical error string.
+const KNOWN_INTEREST_ERRORS = {
+  "You already have an active inquiry for this listing": "You already have an active inquiry for this listing.",
+  "You cannot express interest in your own listing": "You cannot express interest in your own listing.",
+  "Listing is not currently active": "Listing is not currently active.",
+  "Listing not found": "Listing not found.",
+  "Authentication required": "Authentication required.",
+};
+
+const GENERIC_INTEREST_ERROR = "Couldn't send your interest. Please try again.";
+
 // listingId: the listing this interest is being expressed on.
 // buyer_id/seller_id are never supplied from here — createBuyerInterest
 // wraps the create_buyer_interest RPC, which derives both server-side.
@@ -30,7 +45,7 @@ export default function ExpressInterestModal({ listingId, onClose, onSubmitted }
 
     if (error) {
       console.error("Failed to submit buyer interest", error);
-      setSubmitError("Couldn't send your interest. Please try again.");
+      setSubmitError(KNOWN_INTEREST_ERRORS[error.message] || GENERIC_INTEREST_ERROR);
       setSubmitting(false);
       return;
     }
