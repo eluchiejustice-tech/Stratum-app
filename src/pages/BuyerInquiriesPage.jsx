@@ -1,14 +1,24 @@
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Inbox } from "lucide-react";
 import { useAuthContext } from "../context/AuthContext";
-import { getBuyerInquiries, updateBuyerInterestStatus } from "../services/buyerInterest";
+import { getSellerInquiries, updateBuyerInterestStatus } from "../services/buyerInterest";
 import { getListingsByIds } from "../services/listings";
 import { getProfilesByIds } from "../services/profiles";
 
-// Buyer's only permitted transition is withdrawing — to 'declined', and
-// only while the inquiry hasn't already reached a terminal/accepted
-// state. Matches the buyer half of update_buyer_interest_status exactly.
-const WITHDRAWABLE_STATUSES = ["new", "contacted", "negotiating"];
+// Mirrors LISTING_STATE_TRANSITIONS' shape (listings.js) — the seller-side
+// half of the state machine already enforced server-side by
+// update_buyer_interest_status. Buyer-only transitions (withdraw ->
+// declined) intentionally do not appear here; that's BuyerInquiriesPage's
+// responsibility.
+const SELLER_STATUS_TRANSITIONS = {
+  new: ["contacted"],
+  contacted: ["negotiating"],
+  negotiating: ["accepted", "declined"],
+  accepted: ["closed"],
+  declined: ["closed"],
+  closed: [],
+  withdrawn: ["closed"],
+};
 
 const STATUS_LABELS = {
   new: "New",
@@ -18,6 +28,14 @@ const STATUS_LABELS = {
   declined: "Declined",
   closed: "Closed",
   withdrawn: "Withdrawn",
+};
+
+const TRANSITION_LABELS = {
+  contacted: "Mark as contacted",
+  negotiating: "Start negotiating",
+  accepted: "Accept",
+  declined: "Decline",
+  closed: "Close",
 };
 
 const STATUS_COLORS = {
@@ -40,16 +58,16 @@ function formatDate(isoString) {
   });
 }
 
-export default function BuyerInquiriesPage({ onBack, onListingClick, onSellerClick }) {
+export default function SellerInquiriesPage({ onBack, onListingClick }) {
   const { user } = useAuthContext();
 
   const [inquiries, setInquiries] = useState([]);
   const [listingsById, setListingsById] = useState({});
-  const [sellersById, setSellersById] = useState({});
+  const [buyersById, setBuyersById] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const [withdrawingId, setWithdrawingId] = useState(null);
+  const [updatingId, setUpdatingId] = useState(null);
   const [rowError, setRowError] = useState({});
 
   const loadInquiries = useCallback(async () => {
@@ -57,10 +75,10 @@ export default function BuyerInquiriesPage({ onBack, onListingClick, onSellerCli
     setLoading(true);
     setError(null);
 
-    const { data: rows, error: fetchError } = await getBuyerInquiries(user.id);
+    const { data: rows, error: fetchError } = await getSellerInquiries(user.id);
 
     if (fetchError) {
-      console.error("Failed to load buyer inquiries", fetchError);
+      console.error("Failed to load seller inquiries", fetchError);
       setError(true);
       setLoading(false);
       return;
@@ -70,11 +88,11 @@ export default function BuyerInquiriesPage({ onBack, onListingClick, onSellerCli
     setInquiries(inquiryRows);
 
     const listingIds = [...new Set(inquiryRows.map((r) => r.listing_id))];
-    const sellerIds = [...new Set(inquiryRows.map((r) => r.seller_id))];
+    const buyerIds = [...new Set(inquiryRows.map((r) => r.buyer_id))];
 
-    const [listingsRes, sellersRes] = await Promise.all([
+    const [listingsRes, buyersRes] = await Promise.all([
       listingIds.length > 0 ? getListingsByIds(listingIds) : Promise.resolve({ data: [], error: null }),
-      sellerIds.length > 0 ? getProfilesByIds(sellerIds) : Promise.resolve({ data: [], error: null }),
+      buyerIds.length > 0 ? getProfilesByIds(buyerIds) : Promise.resolve({ data: [], error: null }),
     ]);
 
     if (listingsRes.error) {
@@ -83,10 +101,10 @@ export default function BuyerInquiriesPage({ onBack, onListingClick, onSellerCli
       setListingsById(Object.fromEntries((listingsRes.data || []).map((l) => [l.id, l])));
     }
 
-    if (sellersRes.error) {
-      console.error("Failed to load seller profiles for inquiries", sellersRes.error);
+    if (buyersRes.error) {
+      console.error("Failed to load buyer profiles for inquiries", buyersRes.error);
     } else {
-      setSellersById(Object.fromEntries((sellersRes.data || []).map((p) => [p.id, p])));
+      setBuyersById(Object.fromEntries((buyersRes.data || []).map((p) => [p.id, p])));
     }
 
     setLoading(false);
@@ -96,24 +114,24 @@ export default function BuyerInquiriesPage({ onBack, onListingClick, onSellerCli
     loadInquiries();
   }, [loadInquiries]);
 
-  const handleWithdraw = async (interestId) => {
-    if (withdrawingId) return;
-    setWithdrawingId(interestId);
+  const handleStatusChange = async (interestId, newStatus) => {
+    if (updatingId) return;
+    setUpdatingId(interestId);
     setRowError((prev) => ({ ...prev, [interestId]: null }));
 
-    const { data, error: updateError } = await updateBuyerInterestStatus(interestId, "withdrawn");
+    const { data, error: updateError } = await updateBuyerInterestStatus(interestId, newStatus);
 
     if (updateError) {
-      console.error("Failed to withdraw inquiry", updateError);
-      setRowError((prev) => ({ ...prev, [interestId]: "Couldn't withdraw this inquiry. Please try again." }));
-      setWithdrawingId(null);
+      console.error("Failed to update inquiry status", updateError);
+      setRowError((prev) => ({ ...prev, [interestId]: "Couldn't update this inquiry. Please try again." }));
+      setUpdatingId(null);
       return;
     }
 
     setInquiries((prev) =>
       prev.map((row) => (row.id === interestId ? { ...row, status: data.status, updated_at: data.updated_at } : row))
     );
-    setWithdrawingId(null);
+    setUpdatingId(null);
   };
 
   return (
@@ -131,11 +149,11 @@ export default function BuyerInquiriesPage({ onBack, onListingClick, onSellerCli
         </button>
 
         <h1 className="font-serif text-2xl mb-6 flex items-center gap-2">
-          <Inbox size={20} /> My inquiries
+          <Inbox size={20} /> Buyer inquiries
         </h1>
 
         {loading && (
-          <div className="text-center py-12 text-[#3D4148]/60">Loading your inquiries…</div>
+          <div className="text-center py-12 text-[#3D4148]/60">Loading inquiries…</div>
         )}
 
         {!loading && error && (
@@ -149,7 +167,7 @@ export default function BuyerInquiriesPage({ onBack, onListingClick, onSellerCli
             className="text-center py-12 text-[#3D4148]/60"
             style={{ fontFamily: "system-ui, sans-serif" }}
           >
-            You haven't expressed interest in any listings yet.
+            No buyer inquiries yet.
           </div>
         )}
 
@@ -157,8 +175,8 @@ export default function BuyerInquiriesPage({ onBack, onListingClick, onSellerCli
           <div className="space-y-3">
             {inquiries.map((inquiry) => {
               const listing = listingsById[inquiry.listing_id];
-              const seller = sellersById[inquiry.seller_id];
-              const canWithdraw = WITHDRAWABLE_STATUSES.includes(inquiry.status);
+              const buyer = buyersById[inquiry.buyer_id];
+              const nextStates = SELLER_STATUS_TRANSITIONS[inquiry.status] || [];
 
               return (
                 <div
@@ -186,18 +204,7 @@ export default function BuyerInquiriesPage({ onBack, onListingClick, onSellerCli
                     className="text-xs text-[#3D4148]/70 mb-3"
                     style={{ fontFamily: "system-ui, sans-serif" }}
                   >
-                    To{" "}
-                    {seller ? (
-                      <button
-                        onClick={() => onSellerClick(inquiry.seller_id)}
-                        className="hover:text-[#1F4D3D] hover:underline transition"
-                      >
-                        {seller.company || seller.name || "seller"}
-                      </button>
-                    ) : (
-                      "seller"
-                    )}{" "}
-                    · {formatDate(inquiry.created_at)}
+                    From {buyer?.company || buyer?.name || "A buyer"} · {formatDate(inquiry.created_at)}
                   </div>
 
                   <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm mb-3">
@@ -212,7 +219,7 @@ export default function BuyerInquiriesPage({ onBack, onListingClick, onSellerCli
                     {inquiry.offer_price && (
                       <div>
                         <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-0.5">
-                          Your offer
+                          Offer
                         </div>
                         <div className="font-mono text-[#1F4D3D]">{inquiry.offer_price}</div>
                       </div>
@@ -232,14 +239,19 @@ export default function BuyerInquiriesPage({ onBack, onListingClick, onSellerCli
                     <p className="text-xs text-[#8a3b3b] mb-2">{rowError[inquiry.id]}</p>
                   )}
 
-                  {canWithdraw && (
-                    <button
-                      onClick={() => handleWithdraw(inquiry.id)}
-                      disabled={withdrawingId === inquiry.id}
-                      className="border border-[#8a3b3b]/30 text-[#8a3b3b] text-xs font-mono uppercase tracking-wide px-3 py-2 rounded hover:bg-[#8a3b3b]/5 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {withdrawingId === inquiry.id ? "Withdrawing…" : "Withdraw"}
-                    </button>
+                  {nextStates.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {nextStates.map((nextState) => (
+                        <button
+                          key={nextState}
+                          onClick={() => handleStatusChange(inquiry.id, nextState)}
+                          disabled={updatingId === inquiry.id}
+                          className="bg-[#3D4148] text-[#EDE8DC] text-xs font-mono uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {TRANSITION_LABELS[nextState] || nextState}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
               );
