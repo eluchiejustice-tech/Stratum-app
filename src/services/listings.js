@@ -163,25 +163,27 @@ const VERIFICATION_RECORD_STATUS = {
   rejected: "rejected",
 };
 
+// Replaces the previous two-step client-side pattern (separate status
+// update + audit insert, which could leave a status change with no
+// corresponding audit row if the second call failed independently) with a
+// single atomic RPC. set_listing_verification_status performs both writes
+// in one database transaction: if either fails, both roll back together.
+// moderatorId is intentionally unused now — the RPC derives verified_by
+// from auth.uid() server-side, matching the same pattern already used by
+// resubmit_listing and the buyer-interest RPCs. Kept as a parameter only
+// so existing call sites (ListingDetailPage.jsx) don't need to change.
 export async function setListingVerificationStatus(id, decision, moderatorId, notes = null) {
-  const { error: statusError } = await updateListingStatus(id, decision);
-  if (statusError) {
-    return { error: statusError, stage: "status_update" };
-  }
-
-  const { error: recordError } = await createVerificationRecord({
-    verification_type: "listing",
-    reference_id: id,
-    verified_by: moderatorId,
-    status: VERIFICATION_RECORD_STATUS[decision],
-    notes,
+  const { data, error } = await supabase.rpc("set_listing_verification_status", {
+    p_listing_id: id,
+    p_decision: decision,
+    p_notes: notes,
   });
 
-  if (recordError) {
-    return { error: recordError, stage: "verification_record" };
+  if (error) {
+    return { error, stage: "verification_decision" };
   }
 
-  return { error: null, stage: null };
+  return { data, error: null, stage: null };
 }
 
 export async function getVerificationHistory(listingId) {
