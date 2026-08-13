@@ -99,7 +99,7 @@ export default function BuyerInquiriesPage({ onBack, onListingClick, onSellerCli
     setWithdrawingId(interestId);
     setRowError((prev) => ({ ...prev, [interestId]: null }));
 
-    const { data, error: updateError } = await updateBuyerInterestStatus(interestId, "declined");
+    const { data, error: updateError } = await updateBuyerInterestStatus(interestId, "withdrawn");
 
     if (updateError) {
       console.error("Failed to withdraw inquiry", updateError);
