@@ -364,3 +364,14 @@ export async function getVerifiedListingCountForMineral(mineral) {
 export async function getListingEngagementSummary() {
   return supabase.rpc("get_listing_engagement_summary");
 }
+
+// Phase 2 — Saved Listing Lifecycle Awareness. Returns minimal status
+// info (no price/location/contact/document fields) for every listing
+// the calling buyer has saved, regardless of whether that listing is
+// currently visible via mineral_listings_public's RLS. Takes no
+// parameters — the underlying RPC enforces ownership internally via
+// auth.uid(), so this can never be used to look up an arbitrary
+// listing's status.
+export async function getSavedListingStatusSummary() {
+  return supabase.rpc("get_saved_listing_status_summary");
+}
