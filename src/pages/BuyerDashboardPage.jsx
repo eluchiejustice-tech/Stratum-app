@@ -1,12 +1,57 @@
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Bookmark, Heart, MapPin, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Bookmark, Heart, MapPin, ShieldCheck, BookmarkCheck } from "lucide-react";
 import ListingCard from "../components/ListingCard";
 import { mapListingRow } from "../utils/mapListingRow";
 import { getSavedListings, saveListing, unsaveListing } from "../services/savedListings";
 import { getFavouriteSellers, unfavouriteSeller } from "../services/favouriteSellers";
-import { getListingsByIds } from "../services/listings";
+import { getListingsByIds, getSavedListingStatusSummary } from "../services/listings";
 import { getProfilesByIds } from "../services/profiles";
 import { useAuthContext } from "../context/AuthContext";
+
+// Saved Listing Lifecycle Awareness — maps a listing's status/state to
+// the label shown when it's no longer fully visible via the normal
+// public listing view. Deliberately mirrors the muted, informational
+// tone already used for terminal states elsewhere (e.g. inquiry
+// "closed"/"withdrawn" styling).
+function getUnavailableLabel(status, listingState) {
+  if (status === "pending") return "Under review";
+  if (status !== "verified") return "Unavailable";
+  switch (listingState) {
+    case "sold":
+      return "Sold";
+    case "paused":
+      return "Temporarily unavailable";
+    case "archived":
+      return "No longer available";
+    default:
+      return "Unavailable";
+  }
+}
+
+function UnavailableSavedListingCard({ entry, onRemove }) {
+  return (
+    <div className="bg-white rounded-lg p-4 flex items-center justify-between gap-3 shadow-sm border border-[#3D4148]/10">
+      <div>
+        <div className="font-serif text-base leading-tight text-[#3D4148]/70">
+          {entry.mineral || "Listing"}
+        </div>
+        <span
+          className="inline-block mt-1 text-[10px] font-mono uppercase tracking-wide px-2 py-1 rounded bg-[#3D4148]/10 text-[#3D4148]/60"
+          style={{ fontFamily: "system-ui, sans-serif" }}
+        >
+          {getUnavailableLabel(entry.status, entry.listing_state)}
+        </span>
+      </div>
+      <button
+        onClick={() => onRemove(entry.listing_id)}
+        title="Remove from saved listings"
+        className="text-[#3D4148]/50 hover:text-[#8a3b3b] transition shrink-0"
+      >
+        <BookmarkCheck size={16} />
+      </button>
+    </div>
+  );
+}
 
 function FavouriteSellerCard({ profile, onSellerClick, onRemove }) {
   return (
@@ -50,6 +95,7 @@ export default function BuyerDashboardPage({ onBack, onListingClick, onSellerCli
 
   const [savedListings, setSavedListings] = useState([]);
   const [savedListingIds, setSavedListingIds] = useState(new Set());
+  const [unavailableSaved, setUnavailableSaved] = useState([]);
   const [savedLoading, setSavedLoading] = useState(true);
   const [savedError, setSavedError] = useState(null);
 
@@ -75,19 +121,37 @@ export default function BuyerDashboardPage({ onBack, onListingClick, onSellerCli
 
     if (ids.length === 0) {
       setSavedListings([]);
+      setUnavailableSaved([]);
       setSavedLoading(false);
       return;
     }
 
-    const { data: listingRows, error: listingsError } = await getListingsByIds(ids);
-    if (listingsError) {
-      console.error("Failed to load saved listing details", listingsError);
+    const [listingsRes, statusSummaryRes] = await Promise.all([
+      getListingsByIds(ids),
+      getSavedListingStatusSummary(),
+    ]);
+
+    if (listingsRes.error) {
+      console.error("Failed to load saved listing details", listingsRes.error);
       setSavedError(true);
       setSavedLoading(false);
       return;
     }
 
-    setSavedListings((listingRows || []).map(mapListingRow));
+    const visibleListings = listingsRes.data || [];
+    const visibleIds = new Set(visibleListings.map((l) => l.id));
+    setSavedListings(visibleListings.map(mapListingRow));
+
+    // Soft-fail on the status summary — an unavailable-badge feature
+    // failing to load shouldn't block the normally-visible saved
+    // listings from rendering.
+    if (!statusSummaryRes.error) {
+      const unavailable = (statusSummaryRes.data || []).filter(
+        (entry) => !visibleIds.has(entry.listing_id)
+      );
+      setUnavailableSaved(unavailable);
+    }
+
     setSavedLoading(false);
   }, [user]);
 
@@ -152,6 +216,7 @@ export default function BuyerDashboardPage({ onBack, onListingClick, onSellerCli
       return next;
     });
     setSavedListings((prev) => prev.filter((l) => l.id !== listingId));
+    setUnavailableSaved((prev) => prev.filter((e) => e.listing_id !== listingId));
   };
 
   const removeFavouriteSeller = async (sellerId) => {
@@ -195,7 +260,7 @@ export default function BuyerDashboardPage({ onBack, onListingClick, onSellerCli
             </div>
           )}
 
-          {!savedLoading && !savedError && savedListings.length === 0 && (
+          {!savedLoading && !savedError && savedListings.length === 0 && unavailableSaved.length === 0 && (
             <div
               className="text-center py-8 text-[#3D4148]/60"
               style={{ fontFamily: "system-ui, sans-serif" }}
@@ -216,6 +281,18 @@ export default function BuyerDashboardPage({ onBack, onListingClick, onSellerCli
                   onToggleSave={toggleSaveListing}
                   onListingClick={onListingClick}
                   onSellerClick={onSellerClick}
+                />
+              ))}
+            </div>
+          )}
+
+          {!savedLoading && !savedError && unavailableSaved.length > 0 && (
+            <div className="space-y-3 mt-3">
+              {unavailableSaved.map((entry) => (
+                <UnavailableSavedListingCard
+                  key={entry.listing_id}
+                  entry={entry}
+                  onRemove={toggleSaveListing}
                 />
               ))}
             </div>
