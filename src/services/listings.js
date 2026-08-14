@@ -267,4 +267,100 @@ export async function getListingCountsBySeller(sellerId) {
   };
 }
 
-// Same count-only pattern, for the Listing
+// Same count-only pattern, for the Listing Lifecycle overview.
+export async function getListingStateCountsBySeller(sellerId) {
+  const states = ["active", "paused", "sold", "archived"];
+  const results = await Promise.all(
+    states.map((state) =>
+      supabase
+        .from("mineral_listings")
+        .select("*", { count: "exact", head: true })
+        .eq("seller_id", sellerId)
+        .eq("listing_state", state)
+    )
+  );
+
+  const firstError = results.find((r) => r.error)?.error || null;
+  if (firstError) return { data: null, error: firstError };
+
+  const [activeRes, pausedRes, soldRes, archivedRes] = results;
+  return {
+    data: {
+      active: activeRes.count || 0,
+      paused: pausedRes.count || 0,
+      sold: soldRes.count || 0,
+      archived: archivedRes.count || 0,
+    },
+    error: null,
+  };
+}
+
+// Selects only id, mineral, status — not the full ~20-column row. Powers
+// the "Needs Attention" rejected-listings list and the seller's
+// most-listed mineral (for Market Intelligence).
+export async function getListingIdentifiersBySeller(sellerId) {
+  return supabase
+    .from("mineral_listings")
+    .select("id, mineral, status")
+    .eq("seller_id", sellerId)
+    .order("created_at", { ascending: false });
+}
+
+// Seller-scoped moderation feed: the most recent verification_records
+// across ALL of this seller's listings, not per-listing like
+// ListingHistory. reference_id has no real FK to mineral_listings (it's
+// polymorphic across verification_type), so this is a two-step lookup,
+// not a join: first this seller's listing ids+names, then records
+// restricted to those ids. Mineral name is merged back in afterward.
+export async function getRecentModerationActivity(sellerId, limit = 5) {
+  const { data: listings, error: listErr } = await supabase
+    .from("mineral_listings")
+    .select("id, mineral")
+    .eq("seller_id", sellerId);
+
+  if (listErr) return { data: null, error: listErr };
+  if (!listings || listings.length === 0) return { data: [], error: null };
+
+  const idToMineral = Object.fromEntries(listings.map((l) => [l.id, l.mineral]));
+  const ids = listings.map((l) => l.id);
+
+  const { data: records, error: recErr } = await supabase
+    .from("verification_records")
+    .select("id, status, notes, verified_at, reference_id")
+    .eq("verification_type", "listing")
+    .in("reference_id", ids)
+    .order("verified_at", { ascending: false })
+    .limit(limit);
+
+  if (recErr) return { data: null, error: recErr };
+
+  const merged = records.map((r) => ({
+    ...r,
+    mineral: idToMineral[r.reference_id] || "Unknown listing",
+  }));
+
+  return { data: merged, error: null };
+}
+
+// Market Intelligence, deliberately minimal per product decision: a
+// marketplace-wide count of verified listings for one mineral. No price
+// data involved — sidesteps the free-text price field entirely. Reads
+// from mineral_listings_public, matching every other marketplace-wide
+// read in this app.
+export async function getVerifiedListingCountForMineral(mineral) {
+  return supabase
+    .from("mineral_listings_public")
+    .select("*", { count: "exact", head: true })
+    .eq("mineral", mineral)
+    .eq("status", "verified");
+}
+
+// Phase 7D — Engagement Intelligence. Returns aggregate-only counts (no
+// individual events, viewer IDs, or fingerprints) for the calling
+// seller's own listings. Relies entirely on existing RLS on
+// listing_view and contact_seller_click for scoping — this function
+// does no filtering of its own, matching the SECURITY INVOKER design
+// of the underlying RPC.
+export async function getListingEngagementSummary() {
+  return supabase.rpc("get_listing_engagement_summary");
+}
