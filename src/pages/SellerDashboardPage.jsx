@@ -6,6 +6,7 @@ import {
   Ban,
   Check,
   Layers,
+  Eye,
   Plus,
 } from "lucide-react";
 import MyListingsPage from "./MyListingsPage";
@@ -18,6 +19,7 @@ import {
   getListingStateCountsBySeller,
   getListingIdentifiersBySeller,
   getRecentModerationActivity,
+  getListingEngagementSummary,
   createListing,
   createListingPhotos,
   createListingDocument,
@@ -59,6 +61,7 @@ export default function SellerDashboardPage({ onBack, onListingClick, onSellerCl
   const [identifiers, setIdentifiers] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
   const [profile, setProfile] = useState(null);
+  const [engagement, setEngagement] = useState(null);
 
   const [showAdd, setShowAdd] = useState(false);
   const [uploadWarning, setUploadWarning] = useState(null);
@@ -73,12 +76,13 @@ export default function SellerDashboardPage({ onBack, onListingClick, onSellerCl
     setLoading(true);
     setError(null);
 
-    const [countsRes, stateCountsRes, identifiersRes, activityRes, profileRes] = await Promise.all([
+    const [countsRes, stateCountsRes, identifiersRes, activityRes, profileRes, engagementRes] = await Promise.all([
       getListingCountsBySeller(user.id),
       getListingStateCountsBySeller(user.id),
       getListingIdentifiersBySeller(user.id),
       getRecentModerationActivity(user.id, 5),
       getProfileById(user.id),
+      getListingEngagementSummary(),
     ]);
 
     if (countsRes.error || stateCountsRes.error || identifiersRes.error || activityRes.error || profileRes.error) {
@@ -99,6 +103,10 @@ export default function SellerDashboardPage({ onBack, onListingClick, onSellerCl
     setIdentifiers(identifiersRes.data || []);
     setRecentActivity(activityRes.data || []);
     setProfile(profileRes.data);
+
+    if (!engagementRes.error) {
+      setEngagement(engagementRes.data?.[0] || null);
+    }
 
     setLoading(false);
   }, [user]);
@@ -311,6 +319,22 @@ export default function SellerDashboardPage({ onBack, onListingClick, onSellerCl
                   <span>Paused: <strong>{stateCounts.paused}</strong></span>
                   <span>Sold: <strong>{stateCounts.sold}</strong></span>
                   <span>Archived: <strong>{stateCounts.archived}</strong></span>
+                </div>
+              </div>
+            )}
+
+            {/* Engagement — Phase 7D, aggregate-only, no per-listing
+                breakdown or individual viewer data in this increment. */}
+            {engagement && (
+              <div className="bg-white rounded-lg p-5 shadow-sm border border-[#3D4148]/10 mb-6">
+                <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-3">
+                  <Eye size={12} /> Engagement
+                </div>
+                <div className="flex flex-wrap gap-4 text-sm">
+                  <span>All-time views: <strong>{engagement.views_all_time}</strong></span>
+                  <span>Views (7d): <strong>{engagement.views_last_7_days}</strong></span>
+                  <span>All-time contact clicks: <strong>{engagement.contact_clicks_all_time}</strong></span>
+                  <span>Contact clicks (7d): <strong>{engagement.contact_clicks_last_7_days}</strong></span>
                 </div>
               </div>
             )}
