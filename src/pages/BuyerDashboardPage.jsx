@@ -1,5 +1,6 @@
+// BuyerDashboardPage.jsx
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Bookmark, Heart, MapPin, ShieldCheck, BookmarkCheck } from "lucide-react";
+import { ArrowLeft, Bookmark, Heart, MapPin, ShieldCheck, BookmarkCheck, Inbox } from "lucide-react";
 import ListingCard from "../components/ListingCard";
 import { mapListingRow } from "../utils/mapListingRow";
 import { getSavedListings, saveListing, unsaveListing } from "../services/savedListings";
@@ -90,7 +91,7 @@ function FavouriteSellerCard({ profile, onSellerClick, onRemove }) {
   );
 }
 
-export default function BuyerDashboardPage({ onBack, onListingClick, onSellerClick }) {
+export default function BuyerDashboardPage({ onBack, onListingClick, onSellerClick, onBuyerInquiries }) {
   const { user } = useAuthContext();
 
   const [savedListings, setSavedListings] = useState([]);
@@ -244,6 +245,20 @@ export default function BuyerDashboardPage({ onBack, onListingClick, onSellerCli
         </button>
 
         <h1 className="font-serif text-2xl mb-6">My dashboard</h1>
+
+        {onBuyerInquiries && (
+          <div className="bg-white rounded-lg p-5 shadow-sm border border-[#3D4148]/10 mb-6">
+            <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-3">
+              Quick actions
+            </div>
+            <button
+              onClick={onBuyerInquiries}
+              className="flex items-center gap-1.5 bg-[#B8922F] text-[#15130F] font-mono text-xs uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition"
+            >
+              <Inbox size={14} strokeWidth={2.5} /> Your inquiries
+            </button>
+          </div>
+        )}
 
         <div className="mb-10">
           <div className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wide text-[#3D4148]/60 mb-3">
