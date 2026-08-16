@@ -1,23 +1,26 @@
+// BuyerInquiriesPage.jsx
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Inbox } from "lucide-react";
 import { useAuthContext } from "../context/AuthContext";
-import { getSellerInquiries, updateBuyerInterestStatus } from "../services/buyerInterest";
+import { getBuyerInquiries, updateBuyerInterestStatus } from "../services/buyerInterest";
 import { getListingsByIds } from "../services/listings";
 import { getProfilesByIds } from "../services/profiles";
 
-// Mirrors LISTING_STATE_TRANSITIONS' shape (listings.js) — the seller-side
-// half of the state machine already enforced server-side by
-// update_buyer_interest_status. Buyer-only transitions (withdraw ->
-// declined) intentionally do not appear here; that's BuyerInquiriesPage's
-// responsibility.
-const SELLER_STATUS_TRANSITIONS = {
-  new: ["contacted"],
-  contacted: ["negotiating"],
-  negotiating: ["accepted", "declined"],
-  accepted: ["closed"],
-  declined: ["closed"],
+// Buyer-side half of the state machine, confirmed directly against the
+// deployed update_buyer_interest_status RPC (not inferred): a buyer may
+// only ever move an interest to 'withdrawn', and only from 'new',
+// 'contacted', or 'negotiating'. Every other transition (accept, decline,
+// contacted, negotiating, closed) is seller-only and enforced there —
+// see SellerInquiriesPage.jsx's SELLER_STATUS_TRANSITIONS, which this
+// intentionally does not duplicate or mirror beyond shared labels/colors.
+const BUYER_STATUS_TRANSITIONS = {
+  new: ["withdrawn"],
+  contacted: ["withdrawn"],
+  negotiating: ["withdrawn"],
+  accepted: [],
+  declined: [],
   closed: [],
-  withdrawn: ["closed"],
+  withdrawn: [],
 };
 
 const STATUS_LABELS = {
@@ -31,11 +34,7 @@ const STATUS_LABELS = {
 };
 
 const TRANSITION_LABELS = {
-  contacted: "Mark as contacted",
-  negotiating: "Start negotiating",
-  accepted: "Accept",
-  declined: "Decline",
-  closed: "Close",
+  withdrawn: "Withdraw inquiry",
 };
 
 const STATUS_COLORS = {
@@ -58,12 +57,12 @@ function formatDate(isoString) {
   });
 }
 
-export default function SellerInquiriesPage({ onBack, onListingClick }) {
+export default function BuyerInquiriesPage({ onBack, onListingClick }) {
   const { user } = useAuthContext();
 
   const [inquiries, setInquiries] = useState([]);
   const [listingsById, setListingsById] = useState({});
-  const [buyersById, setBuyersById] = useState({});
+  const [sellersById, setSellersById] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -75,10 +74,10 @@ export default function SellerInquiriesPage({ onBack, onListingClick }) {
     setLoading(true);
     setError(null);
 
-    const { data: rows, error: fetchError } = await getSellerInquiries(user.id);
+    const { data: rows, error: fetchError } = await getBuyerInquiries(user.id);
 
     if (fetchError) {
-      console.error("Failed to load seller inquiries", fetchError);
+      console.error("Failed to load buyer inquiries", fetchError);
       setError(true);
       setLoading(false);
       return;
@@ -88,11 +87,14 @@ export default function SellerInquiriesPage({ onBack, onListingClick }) {
     setInquiries(inquiryRows);
 
     const listingIds = [...new Set(inquiryRows.map((r) => r.listing_id))];
-    const buyerIds = [...new Set(inquiryRows.map((r) => r.buyer_id))];
+    // Buyer-facing correction: resolve the SELLER's profile per row, not
+    // the buyer's own — the buyer already knows who they are; what they
+    // need to see is who they're talking to.
+    const sellerIds = [...new Set(inquiryRows.map((r) => r.seller_id))];
 
-    const [listingsRes, buyersRes] = await Promise.all([
+    const [listingsRes, sellersRes] = await Promise.all([
       listingIds.length > 0 ? getListingsByIds(listingIds) : Promise.resolve({ data: [], error: null }),
-      buyerIds.length > 0 ? getProfilesByIds(buyerIds) : Promise.resolve({ data: [], error: null }),
+      sellerIds.length > 0 ? getProfilesByIds(sellerIds) : Promise.resolve({ data: [], error: null }),
     ]);
 
     if (listingsRes.error) {
@@ -101,10 +103,10 @@ export default function SellerInquiriesPage({ onBack, onListingClick }) {
       setListingsById(Object.fromEntries((listingsRes.data || []).map((l) => [l.id, l])));
     }
 
-    if (buyersRes.error) {
-      console.error("Failed to load buyer profiles for inquiries", buyersRes.error);
+    if (sellersRes.error) {
+      console.error("Failed to load seller profiles for inquiries", sellersRes.error);
     } else {
-      setBuyersById(Object.fromEntries((buyersRes.data || []).map((p) => [p.id, p])));
+      setSellersById(Object.fromEntries((sellersRes.data || []).map((p) => [p.id, p])));
     }
 
     setLoading(false);
@@ -149,7 +151,7 @@ export default function SellerInquiriesPage({ onBack, onListingClick }) {
         </button>
 
         <h1 className="font-serif text-2xl mb-6 flex items-center gap-2">
-          <Inbox size={20} /> Buyer inquiries
+          <Inbox size={20} /> Your inquiries
         </h1>
 
         {loading && (
@@ -167,7 +169,7 @@ export default function SellerInquiriesPage({ onBack, onListingClick }) {
             className="text-center py-12 text-[#3D4148]/60"
             style={{ fontFamily: "system-ui, sans-serif" }}
           >
-            No buyer inquiries yet.
+            No inquiries yet.
           </div>
         )}
 
@@ -175,8 +177,8 @@ export default function SellerInquiriesPage({ onBack, onListingClick }) {
           <div className="space-y-3">
             {inquiries.map((inquiry) => {
               const listing = listingsById[inquiry.listing_id];
-              const buyer = buyersById[inquiry.buyer_id];
-              const nextStates = SELLER_STATUS_TRANSITIONS[inquiry.status] || [];
+              const seller = sellersById[inquiry.seller_id];
+              const nextStates = BUYER_STATUS_TRANSITIONS[inquiry.status] || [];
 
               return (
                 <div
@@ -204,7 +206,7 @@ export default function SellerInquiriesPage({ onBack, onListingClick }) {
                     className="text-xs text-[#3D4148]/70 mb-3"
                     style={{ fontFamily: "system-ui, sans-serif" }}
                   >
-                    From {buyer?.company || buyer?.name || "A buyer"} · {formatDate(inquiry.created_at)}
+                    To {seller?.company || seller?.name || "A seller"} · {formatDate(inquiry.created_at)}
                   </div>
 
                   <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm mb-3">
