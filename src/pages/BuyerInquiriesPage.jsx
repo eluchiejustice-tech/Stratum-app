@@ -1,10 +1,11 @@
 // BuyerInquiriesPage.jsx
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Inbox } from "lucide-react";
+import { ArrowLeft, Inbox, MessageCircle } from "lucide-react";
 import { useAuthContext } from "../context/AuthContext";
 import { getBuyerInquiries, updateBuyerInterestStatus } from "../services/buyerInterest";
 import { getListingsByIds } from "../services/listings";
 import { getProfilesByIds } from "../services/profiles";
+import MessageThread from "../components/MessageThread";
 
 // Buyer-side half of the state machine, confirmed directly against the
 // deployed update_buyer_interest_status RPC (not inferred): a buyer may
@@ -69,6 +70,11 @@ export default function BuyerInquiriesPage({ onBack, onListingClick }) {
   const [updatingId, setUpdatingId] = useState(null);
   const [rowError, setRowError] = useState({});
 
+  // Deal Communication V1 — same single-open-thread pattern approved for
+  // SellerInquiriesPage.jsx: one conversation open at a time, opening
+  // another auto-collapses the previous one.
+  const [expandedId, setExpandedId] = useState(null);
+
   const loadInquiries = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -87,9 +93,6 @@ export default function BuyerInquiriesPage({ onBack, onListingClick }) {
     setInquiries(inquiryRows);
 
     const listingIds = [...new Set(inquiryRows.map((r) => r.listing_id))];
-    // Buyer-facing correction: resolve the SELLER's profile per row, not
-    // the buyer's own — the buyer already knows who they are; what they
-    // need to see is who they're talking to.
     const sellerIds = [...new Set(inquiryRows.map((r) => r.seller_id))];
 
     const [listingsRes, sellersRes] = await Promise.all([
@@ -136,6 +139,10 @@ export default function BuyerInquiriesPage({ onBack, onListingClick }) {
     setUpdatingId(null);
   };
 
+  const toggleConversation = (interestId) => {
+    setExpandedId((prev) => (prev === interestId ? null : interestId));
+  };
+
   return (
     <div
       className="min-h-screen bg-[#EDE8DC] text-[#15130F]"
@@ -179,6 +186,7 @@ export default function BuyerInquiriesPage({ onBack, onListingClick }) {
               const listing = listingsById[inquiry.listing_id];
               const seller = sellersById[inquiry.seller_id];
               const nextStates = BUYER_STATUS_TRANSITIONS[inquiry.status] || [];
+              const isExpanded = expandedId === inquiry.id;
 
               return (
                 <div
@@ -237,12 +245,22 @@ export default function BuyerInquiriesPage({ onBack, onListingClick }) {
                     </p>
                   )}
 
+                  <button
+                    onClick={() => toggleConversation(inquiry.id)}
+                    className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wide text-[#3D4148]/70 hover:text-[#15130F] underline transition mb-1"
+                  >
+                    <MessageCircle size={13} />
+                    {isExpanded ? "Hide conversation" : "View conversation"}
+                  </button>
+
+                  {isExpanded && <MessageThread interestId={inquiry.id} />}
+
                   {rowError[inquiry.id] && (
-                    <p className="text-xs text-[#8a3b3b] mb-2">{rowError[inquiry.id]}</p>
+                    <p className="text-xs text-[#8a3b3b] mt-2 mb-2">{rowError[inquiry.id]}</p>
                   )}
 
                   {nextStates.length > 0 && (
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap mt-3">
                       {nextStates.map((nextState) => (
                         <button
                           key={nextState}
