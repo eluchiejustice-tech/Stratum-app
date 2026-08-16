@@ -1,9 +1,12 @@
+// EditListingModal.jsx
 import { useState } from "react";
 import { X } from "lucide-react";
 import { supabase } from "../services/supabaseClient";
 import { AFRICA_LOCATIONS } from "../data/africaLocations";
 import { MINERAL_COLORS } from "../utils/mineralColors";
 import { updateListingContent, createListingPhotos, createListingDocument, deleteListingPhoto } from "../services/listings";
+import { createAssay } from "../services/assays";
+import { useAuthContext } from "../context/AuthContext";
 
 const QUANTITY_UNITS = ["kg", "g", "tonnes", "tons", "lb", "oz"];
 const MAX_PHOTOS = 5;
@@ -82,12 +85,37 @@ function validate(form, customMineral) {
   return errors;
 }
 
+// Validates the optional assay-entry section. Deliberately a no-op
+// (returns no errors) when the seller hasn't touched any assay field —
+// adding an assay is optional, so an empty section must never block
+// saving the rest of the listing. Once any of mineral/value/unit has
+// been entered, all three become required together.
+function validateAssay(form) {
+  const errors = {};
+  const anyFilled = form.mineral.trim() || form.value.trim() || form.unit.trim();
+  if (!anyFilled) return errors;
+
+  if (!form.mineral.trim()) errors.mineral = "Required to submit an assay.";
+
+  if (!form.value.trim()) {
+    errors.value = "Required to submit an assay.";
+  } else if (isNaN(Number(form.value)) || Number(form.value) <= 0) {
+    errors.value = "Enter a valid positive number.";
+  }
+
+  if (!form.unit.trim()) errors.unit = "Required to submit an assay.";
+
+  return errors;
+}
+
 // listing: the already-loaded, mapped listing object from
 // ListingDetailPage (via mapListingRow) — no separate fetch happens here.
 // existingPhotos: the listing's current listing_photos rows ({ id,
 // photo_url, position }), passed in from ListingDetailPage so this modal
 // can both display them and delete them without a separate fetch here.
 export default function EditListingModal({ listing, existingPhotos, onClose, onSaved }) {
+  const { user } = useAuthContext();
+
   const parsedQuantity = parseQuantity(listing.quantity);
   const startingMineralIsKnown = isKnownMineral(listing.mineral);
 
@@ -120,6 +148,18 @@ export default function EditListingModal({ listing, existingPhotos, onClose, onS
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docUploadError, setDocUploadError] = useState(null);
 
+  // Optional structured-assay entry — V1 scope is create-only. No
+  // editing or deleting an already-submitted assay from this modal.
+  const [assayForm, setAssayForm] = useState({
+    mineral: "",
+    value: "",
+    unit: "",
+    gradeType: "",
+    method: "",
+    assayDate: "",
+  });
+  const [assayErrors, setAssayErrors] = useState({});
+
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
 
@@ -130,6 +170,13 @@ export default function EditListingModal({ listing, existingPhotos, onClose, onS
     setForm((f) => ({ ...f, [field]: value }));
     if (errors[field]) {
       setErrors((e) => ({ ...e, [field]: undefined }));
+    }
+  };
+
+  const updateAssayField = (field, value) => {
+    setAssayForm((f) => ({ ...f, [field]: value }));
+    if (assayErrors[field]) {
+      setAssayErrors((e) => ({ ...e, [field]: undefined }));
     }
   };
 
@@ -265,8 +312,10 @@ export default function EditListingModal({ listing, existingPhotos, onClose, onS
 
   const handleSave = async () => {
     const validationErrors = validate(form, customMineral);
+    const assayValidationErrors = validateAssay(assayForm);
     setErrors(validationErrors);
-    if (Object.keys(validationErrors).length > 0) return;
+    setAssayErrors(assayValidationErrors);
+    if (Object.keys(validationErrors).length > 0 || Object.keys(assayValidationErrors).length > 0) return;
     if (anyPhotoUploading || uploadingDoc) return;
 
     setSaving(true);
@@ -302,6 +351,25 @@ export default function EditListingModal({ listing, existingPhotos, onClose, onS
       if (docError) {
         console.error("Failed to attach replacement document", docError);
         setSaveError("Listing saved, but the new document couldn't be attached. Please try uploading it again.");
+        setSaving(false);
+        return;
+      }
+    }
+
+    const assayFilled = assayForm.mineral.trim() || assayForm.value.trim() || assayForm.unit.trim();
+    if (assayFilled) {
+      const { error: assayError } = await createAssay(listing.id, user.id, {
+        mineral: assayForm.mineral.trim(),
+        numeric_value: Number(assayForm.value),
+        unit: assayForm.unit.trim(),
+        grade_type: assayForm.gradeType.trim(),
+        method: assayForm.method.trim(),
+        assay_date: assayForm.assayDate,
+      });
+
+      if (assayError) {
+        console.error("Failed to submit assay", assayError);
+        setSaveError("Listing saved, but the assay couldn't be submitted. Please try again.");
         setSaving(false);
         return;
       }
@@ -565,6 +633,87 @@ export default function EditListingModal({ listing, existingPhotos, onClose, onS
             {documentUrl && !uploadingDoc && (
               <p className="text-[10px] text-[#1F4D3D] mt-1">New document attached ✓</p>
             )}
+          </div>
+
+          <div className="border-t border-[#3D4148]/10 pt-3">
+            <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">
+              Add structured assay (optional)
+            </label>
+            <p className="text-[10px] text-[#3D4148]/60 mt-0.5 mb-2">
+              Submitted for moderator review. Cannot be edited after submission.
+            </p>
+
+            <div className="space-y-2">
+              <div>
+                <input
+                  value={assayForm.mineral}
+                  onChange={(e) => updateAssayField("mineral", e.target.value)}
+                  placeholder="Mineral / element (e.g. Gold, Au)"
+                  className={`w-full bg-white border rounded px-3 py-2 text-sm ${
+                    assayErrors.mineral ? "border-[#8a3b3b]" : "border-[#3D4148]/20"
+                  }`}
+                />
+                {assayErrors.mineral && (
+                  <p className="text-[10px] text-[#8a3b3b] mt-1">{assayErrors.mineral}</p>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={assayForm.value}
+                    onChange={(e) => updateAssayField("value", e.target.value)}
+                    placeholder="Value"
+                    className={`w-full bg-white border rounded px-3 py-2 text-sm ${
+                      assayErrors.value ? "border-[#8a3b3b]" : "border-[#3D4148]/20"
+                    }`}
+                  />
+                  {assayErrors.value && (
+                    <p className="text-[10px] text-[#8a3b3b] mt-1">{assayErrors.value}</p>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <input
+                    value={assayForm.unit}
+                    onChange={(e) => updateAssayField("unit", e.target.value)}
+                    placeholder="Unit (e.g. g/t, %)"
+                    className={`w-full bg-white border rounded px-3 py-2 text-sm ${
+                      assayErrors.unit ? "border-[#8a3b3b]" : "border-[#3D4148]/20"
+                    }`}
+                  />
+                  {assayErrors.unit && (
+                    <p className="text-[10px] text-[#8a3b3b] mt-1">{assayErrors.unit}</p>
+                  )}
+                </div>
+              </div>
+
+              <input
+                value={assayForm.gradeType}
+                onChange={(e) => updateAssayField("gradeType", e.target.value)}
+                placeholder="Grade type (optional, e.g. head grade)"
+                className="w-full bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
+              />
+
+              <input
+                value={assayForm.method}
+                onChange={(e) => updateAssayField("method", e.target.value)}
+                placeholder="Method (optional, e.g. Fire assay)"
+                className="w-full bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
+              />
+
+              <div>
+                <label className="text-[10px] text-[#3D4148]/60">Assay date (optional)</label>
+                <input
+                  type="date"
+                  value={assayForm.assayDate}
+                  onChange={(e) => updateAssayField("assayDate", e.target.value)}
+                  className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
