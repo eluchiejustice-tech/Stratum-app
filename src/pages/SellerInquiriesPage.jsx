@@ -1,9 +1,11 @@
+// SellerInquiriesPage.jsx
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Inbox } from "lucide-react";
+import { ArrowLeft, Inbox, MessageCircle } from "lucide-react";
 import { useAuthContext } from "../context/AuthContext";
 import { getSellerInquiries, updateBuyerInterestStatus } from "../services/buyerInterest";
 import { getListingsByIds } from "../services/listings";
 import { getProfilesByIds } from "../services/profiles";
+import MessageThread from "../components/MessageThread";
 
 // Mirrors LISTING_STATE_TRANSITIONS' shape (listings.js) — the seller-side
 // half of the state machine already enforced server-side by
@@ -17,6 +19,7 @@ const SELLER_STATUS_TRANSITIONS = {
   accepted: ["closed"],
   declined: ["closed"],
   closed: [],
+  withdrawn: ["closed"],
 };
 
 const STATUS_LABELS = {
@@ -26,6 +29,7 @@ const STATUS_LABELS = {
   accepted: "Accepted",
   declined: "Declined",
   closed: "Closed",
+  withdrawn: "Withdrawn",
 };
 
 const TRANSITION_LABELS = {
@@ -43,6 +47,7 @@ const STATUS_COLORS = {
   accepted: "bg-[#1F4D3D]/10 text-[#1F4D3D]",
   declined: "bg-[#8a3b3b]/10 text-[#8a3b3b]",
   closed: "bg-[#3D4148]/10 text-[#3D4148]/60",
+  withdrawn: "bg-[#3D4148]/10 text-[#3D4148]/60",
 };
 
 function formatDate(isoString) {
@@ -66,6 +71,13 @@ export default function SellerInquiriesPage({ onBack, onListingClick }) {
 
   const [updatingId, setUpdatingId] = useState(null);
   const [rowError, setRowError] = useState({});
+
+  // Deal Communication V1 — per-row conversation expansion. A single
+  // expandedId (rather than a Set) means only one thread is open at a
+  // time; each card's own id is checked against it, so cards toggle
+  // completely independently of one another with no shared state beyond
+  // "which one, if any, is currently open."
+  const [expandedId, setExpandedId] = useState(null);
 
   const loadInquiries = useCallback(async () => {
     if (!user) return;
@@ -131,6 +143,10 @@ export default function SellerInquiriesPage({ onBack, onListingClick }) {
     setUpdatingId(null);
   };
 
+  const toggleConversation = (interestId) => {
+    setExpandedId((prev) => (prev === interestId ? null : interestId));
+  };
+
   return (
     <div
       className="min-h-screen bg-[#EDE8DC] text-[#15130F]"
@@ -174,6 +190,7 @@ export default function SellerInquiriesPage({ onBack, onListingClick }) {
               const listing = listingsById[inquiry.listing_id];
               const buyer = buyersById[inquiry.buyer_id];
               const nextStates = SELLER_STATUS_TRANSITIONS[inquiry.status] || [];
+              const isExpanded = expandedId === inquiry.id;
 
               return (
                 <div
@@ -232,12 +249,22 @@ export default function SellerInquiriesPage({ onBack, onListingClick }) {
                     </p>
                   )}
 
+                  <button
+                    onClick={() => toggleConversation(inquiry.id)}
+                    className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wide text-[#3D4148]/70 hover:text-[#15130F] underline transition mb-1"
+                  >
+                    <MessageCircle size={13} />
+                    {isExpanded ? "Hide conversation" : "View conversation"}
+                  </button>
+
+                  {isExpanded && <MessageThread interestId={inquiry.id} />}
+
                   {rowError[inquiry.id] && (
-                    <p className="text-xs text-[#8a3b3b] mb-2">{rowError[inquiry.id]}</p>
+                    <p className="text-xs text-[#8a3b3b] mt-2 mb-2">{rowError[inquiry.id]}</p>
                   )}
 
                   {nextStates.length > 0 && (
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap mt-3">
                       {nextStates.map((nextState) => (
                         <button
                           key={nextState}
