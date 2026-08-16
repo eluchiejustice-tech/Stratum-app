@@ -19,6 +19,7 @@ import {
   createListingDocument,
   LISTING_STATE_TRANSITIONS,
 } from "../services/listings";
+import { getAssaysByListing, getAssayVerificationHistory } from "../services/assays";
 import { getProfileById, getApprovedListingsBySeller } from "../services/profiles";
 import { logListingView, logContactSellerClick } from "../services/buyerInterest";
 import { useAuthContext } from "../context/AuthContext";
@@ -109,6 +110,13 @@ export default function ListingDetailPage({ listingId, onBack, onSellerClick }) 
   const [showEditModal, setShowEditModal] = useState(false);
   const [showExpressInterestModal, setShowExpressInterestModal] = useState(false);
 
+  // Assay verification display — read-only for this increment. assays
+  // holds each assay row for this listing; assayHistories maps
+  // assay id -> its verification history records (same shape
+  // ListingHistory.jsx already expects from listing verification).
+  const [assays, setAssays] = useState([]);
+  const [assayHistories, setAssayHistories] = useState({});
+
   // Request-race guard: every call to loadListing() claims a new request id.
   // Before each state update in the async chain below, we confirm this
   // call's id is still the current one. If a newer call (a different
@@ -148,7 +156,7 @@ export default function ListingDetailPage({ listingId, onBack, onSellerClick }) 
     // the listing even if this request is later superseded.
     logListingView(listingId);
 
-    const [photosRes, profileRes, listingsRes, documentUrl, historyRes] = await Promise.all([
+    const [photosRes, profileRes, listingsRes, documentUrl, historyRes, assaysRes] = await Promise.all([
       getPhotosByListing(listingId),
       mapped.sellerId
         ? getProfileById(mapped.sellerId)
@@ -158,6 +166,7 @@ export default function ListingDetailPage({ listingId, onBack, onSellerClick }) 
         : Promise.resolve({ data: null, error: null }),
       getSignedDocumentUrl(listingId),
       getVerificationHistory(listingId),
+      getAssaysByListing(listingId),
     ]);
 
     if (!isCurrent()) return;
@@ -195,6 +204,41 @@ export default function ListingDetailPage({ listingId, onBack, onSellerClick }) 
     } else {
       setSellerProfile(null);
       setSellerListingCount(null);
+    }
+
+    if (assaysRes.error) {
+      console.error("Failed to load assays", assaysRes.error);
+      setAssays([]);
+      setAssayHistories({});
+    } else {
+      const assayRows = assaysRes.data || [];
+      setAssays(assayRows);
+
+      // Second-stage fetch: each assay's own verification history.
+      // Guarded by the same isCurrent() check before being applied, so a
+      // slow response here can't overwrite state for a listing the user
+      // has since navigated away from.
+      if (assayRows.length > 0) {
+        const historyResults = await Promise.all(
+          assayRows.map((a) => getAssayVerificationHistory(a.id))
+        );
+
+        if (!isCurrent()) return;
+
+        const historyMap = {};
+        assayRows.forEach((a, idx) => {
+          const res = historyResults[idx];
+          if (res.error) {
+            console.error("Failed to load assay verification history", a.id, res.error);
+            historyMap[a.id] = [];
+          } else {
+            historyMap[a.id] = res.data || [];
+          }
+        });
+        setAssayHistories(historyMap);
+      } else {
+        setAssayHistories({});
+      }
     }
 
     setLoading(false);
@@ -303,7 +347,7 @@ export default function ListingDetailPage({ listingId, onBack, onSellerClick }) 
 
   const handleLifecycleTransition = async (newState) => {
     if (transitioning) return;
-if (newState === "archived") {
+    if (newState === "archived") {
       const confirmed = window.confirm(
         "Archive this listing? This is permanent — archived listings cannot be reactivated."
       );
@@ -373,512 +417,3 @@ if (newState === "archived") {
     rejected: "Verification rejected",
     unverified: "Unverified seller",
   }[sellerVerificationStatus] || "Unverified seller";
-return (
-    <div
-      className="min-h-screen bg-[#EDE8DC] text-[#15130F]"
-      style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
-    >
-      <div className="max-w-4xl mx-auto px-5 sm:px-8 py-6">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wide text-[#3D4148]/70 hover:text-[#15130F] transition mb-6"
-          style={{ fontFamily: "system-ui, sans-serif" }}
-        >
-          <ArrowLeft size={14} /> Back to marketplace
-        </button>
-
-        {loading && (
-          <div className="text-center py-12 text-[#3D4148]/60">
-            Loading listing…
-          </div>
-        )}
-
-        {!loading && error && (
-          <div className="text-center py-12 text-[#8a3b3b]">
-            Couldn't load this listing. Please try again.
-          </div>
-        )}
-
-        {!loading && !error && !listing && (
-          <div className="text-center py-12 text-[#3D4148]/60">
-            This listing could not be found.
-          </div>
-        )}
-
-        {!loading && !error && listing && (
-          <div className="bg-white rounded-lg p-6 shadow-sm border border-[#3D4148]/10">
-            <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
-              <div>
-                <div className="font-serif text-2xl leading-tight">
-                  {listing.mineral}
-                </div>
-              </div>
-
-              <VerifiedBadge verified={listing.verified} />
-            </div>
-
-            <div className="flex gap-5 flex-wrap sm:flex-nowrap">
-              <div className="shrink-0 w-full sm:w-56">
-                {galleryUrls.length > 0 ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setLightboxOpen(true)}
-                      onTouchStart={handleTouchStart}
-                      onTouchEnd={handleTouchEnd}
-                      className="block w-full"
-                    >
-                      <img
-                        src={galleryUrls[activeIndex]}
-                        alt={`${listing.mineral} photo ${activeIndex + 1}`}
-                        className="w-full sm:w-56 h-56 object-cover rounded-lg border border-[#3D4148]/10"
-                      />
-                    </button>
-
-                    {galleryUrls.length > 1 && (
-                      <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
-                        {galleryUrls.map((url, idx) => (
-                          <button
-                            key={`${url}-${idx}`}
-                            type="button"
-                            onClick={() => setActiveIndex(idx)}
-                            className={`shrink-0 w-12 h-12 rounded overflow-hidden border-2 transition ${
-                              idx === activeIndex
-                                ? "border-[#1F4D3D]"
-                                : "border-transparent opacity-70 hover:opacity-100"
-                            }`}
-                          >
-                            <img
-                              src={url}
-                              alt={`Thumbnail ${idx + 1}`}
-                              className="w-full h-full object-cover"
-                            />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="w-full sm:w-56 h-56 flex items-center justify-center">
-                    <CoreSample bands={listing.strata} />
-                  </div>
-                )}
-              </div>
-
-              <div className="flex-1 min-w-0 space-y-4">
-                <div>
-                  <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-1">
-                    Grade / specification
-                  </div>
-
-                  <p
-                    className="text-sm text-[#3D4148] leading-relaxed"
-                    style={{ fontFamily: "system-ui, sans-serif" }}
-                  >
-                    {listing.grade}
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-x-6 gap-y-3">
-                  <div>
-                    <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-1">
-                      Quantity
-                    </div>
-
-                    <div className="text-sm font-mono">
-                      {listing.quantity}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-1">
-                      Location
-                    </div>
-
-                    <div className="text-sm flex items-center gap-1">
-                      <MapPin size={12} />
-                      {listing.location}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-1">
-                      Price
-                    </div>
-
-                    <div className="text-sm font-mono text-[#1F4D3D]">
-                      {listing.price}
-                    </div>
-                  </div>
-
-                  {postedDate && (
-                    <div>
-                      <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-1">
-                        Posted
-                      </div>
-
-                      <div className="text-sm font-mono">
-                        {postedDate}
-                      </div>
-                    </div>
-                  )}
-
-                  <div>
-                    <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-1">
-                      Listing status
-                    </div>
-
-                    <div className="text-sm font-mono">
-                      {listing.verified
-                        ? "Verified"
-                        : listing.statusRaw === "rejected"
-                        ? "Rejected"
-                        : "Pending review"}
-                    </div>
-                  </div>
-                </div>
-
-                {signedDocumentUrl && (
-                  <a
-                    href={signedDocumentUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-sm text-[#1F4D3D] underline w-fit"
-                  >
-                    <FileText size={14} />
-                    Assay report / certificate
-                  </a>
-                )}
-              </div>
-            </div>
-
-            <div className="border-t border-[#3D4148]/10 mt-5 pt-4">
-              <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-2">
-                Seller trust summary
-              </div>
-
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-[#3D4148]">
-                <span
-                  className={`inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wide px-2 py-1 rounded ${
-                    sellerVerificationStatus === "verified"
-                      ? "bg-[#1F4D3D]/10 text-[#1F4D3D]"
-                      : sellerVerificationStatus === "pending"
-                      ? "bg-[#9c7a1f]/10 text-[#9c7a1f]"
-                      : sellerVerificationStatus === "rejected"
-                      ? "bg-[#8a3b3b]/10 text-[#8a3b3b]"
-                      : "bg-[#3D4148]/10 text-[#3D4148]/70"
-                  }`}
-                  style={{ fontFamily: "system-ui, sans-serif" }}
-                >
-                  <ShieldCheck size={11} />
-                  {sellerVerificationLabel}
-                </span>
-
-                {sellerProfile?.company && (
-                  <span style={{ fontFamily: "system-ui, sans-serif" }}>
-                    {sellerProfile.company}
-                  </span>
-                )}
-
-                {sellerProfile?.location && (
-                  <span
-                    className="flex items-center gap-1"
-                    style={{ fontFamily: "system-ui, sans-serif" }}
-                  >
-                    <MapPin size={11} />
-                    {sellerProfile.location}
-                  </span>
-                )}
-
-                {sellerListingCount !== null && (
-                  <span style={{ fontFamily: "system-ui, sans-serif" }}>
-                    {sellerListingCount} active listing
-                    {sellerListingCount === 1 ? "" : "s"}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {isOwner && (
-              <div className="border-t border-[#3D4148]/10 mt-4 pt-4">
-                <button
-                  onClick={openEditModal}
-                  className="text-xs font-mono uppercase tracking-wide text-[#3D4148]/70 hover:text-[#15130F] underline transition mb-3"
-                >
-                  Edit listing details
-                </button>
-
-                <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-2">
-                  Listing lifecycle
-                </div>
-
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-[#3D4148] mb-3">
-                  <span
-                    className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wide px-2 py-1 rounded bg-[#3D4148]/10 text-[#3D4148]/80"
-                    style={{ fontFamily: "system-ui, sans-serif" }}
-                  >
-                    {LIFECYCLE_STATE_LABELS[listing.listingState] ||
-                      listing.listingState}
-                  </span>
-                </div>
-
-                {allowedNextStates.length > 0 ? (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {allowedNextStates.map((nextState) => (
-                      <button
-                        key={nextState}
-                        onClick={() =>
-                          handleLifecycleTransition(nextState)
-                        }
-                        disabled={transitioning}
-                        className="bg-[#3D4148] text-[#EDE8DC] text-xs font-mono uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {LIFECYCLE_TRANSITION_LABELS[nextState] ||
-                          nextState}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-xs text-[#3D4148]/50 font-mono">
-                    This listing is archived and can no longer be changed.
-                  </div>
-                )}
-
-                {lifecycleError && (
-                  <div className="text-xs text-[#8a3b3b] font-mono mt-2">
-                    {lifecycleError}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {canSeeHistory && (
-              <ListingHistory records={historyRecords} />
-            )}
-
-            {isOwner && listing.statusRaw === "rejected" && (
-              <div className="border-t border-[#3D4148]/10 mt-4 pt-4">
-                <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-2">
-                  Resubmit for review
-                </div>
-
-                <p
-                  className="text-xs text-[#3D4148]/70 mb-3"
-                  style={{ fontFamily: "system-ui, sans-serif" }}
-                >
-                  Review the feedback above, make any needed corrections,
-                  then resubmit this listing for moderator review.
-                </p>
-
-                <div className="mb-3">
-                  <label className="text-[11px] font-mono uppercase tracking-wide text-[#3D4148]">
-                    Replace assay report (optional)
-                  </label>
-
-                  <input
-                    type="file"
-                    accept="application/pdf,image/jpeg,image/png,image/webp"
-                    onChange={handleReplaceDocument}
-                    disabled={uploadingDoc}
-                    className="w-full mt-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm disabled:opacity-50"
-                  />
-
-                  {uploadingDoc && (
-                    <p className="text-[10px] text-[#3D4148]/60 mt-1">
-                      Uploading document…
-                    </p>
-                  )}
-
-                  {docUploadError && (
-                    <p className="text-[10px] text-[#8a3b3b] mt-1">
-                      {docUploadError}
-                    </p>
-                  )}
-                </div>
-
-                <button
-                  onClick={handleResubmit}
-                  disabled={resubmitting}
-                  className="bg-[#1F4D3D] text-[#EDE8DC] text-xs font-mono uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {resubmitting
-                    ? "Resubmitting…"
-                    : "Resubmit listing"}
-                </button>
-
-                {resubmitError && (
-                  <div className="text-xs text-[#8a3b3b] font-mono mt-2">
-                    {resubmitError}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="border-t border-[#3D4148]/10 mt-4 pt-4 flex items-center justify-between flex-wrap gap-3">
-              <div>
-                <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-1">
-                  Seller
-                </div>
-
-                {canOpenSellerProfile ? (
-                  <button
-                    onClick={() =>
-                      onSellerClick(listing.sellerId)
-                    }
-                    className="text-sm font-mono uppercase tracking-wide text-[#3D4148] hover:text-[#1F4D3D] hover:underline transition text-left"
-                  >
-                    {listing.company || listing.seller}
-                  </button>
-                ) : (
-                  <div className="text-sm font-mono uppercase tracking-wide text-[#3D4148]">
-                    {listing.company || listing.seller}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap justify-end">
-                {isAdmin && !listing.verified && (
-                  <button
-                    onClick={verifyListing}
-                    className="bg-[#1F4D3D] text-[#EDE8DC] text-xs font-mono uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition"
-                  >
-                    Approve
-                  </button>
-                )}
-
-                {isAdmin && (
-                  <button
-                    onClick={openRejectModal}
-                    className="bg-[#8a3b3b] text-[#EDE8DC] text-xs font-mono uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition"
-                  >
-                    Reject
-                  </button>
-                )}
-
-                {canExpressInterest && (
-                  <button
-                    onClick={openExpressInterestModal}
-                    className="bg-[#3D4148] text-[#EDE8DC] text-xs font-mono uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition"
-                  >
-                    Express interest
-                  </button>
-                )}
-
-                {!user ? (
-                  <span className="text-xs text-[#3D4148]/50 font-mono px-3 py-2">
-                    Sign in to contact seller
-                  </span>
-                ) : contactOptions.length > 0 ? (
-                  contactOptions.map((opt) => {
-                    const Icon = CONTACT_ICONS[opt.type];
-
-                    return (
-                      <a
-                        key={opt.type}
-                        href={opt.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() =>
-                          logContactSellerClick(
-                            listing.id,
-                            opt.type
-                          )
-                        }
-                        className="flex items-center gap-1.5 bg-[#1F4D3D] text-[#EDE8DC] text-xs font-mono uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition"
-                      >
-                        <Icon size={13} />
-                        {opt.label}
-                      </a>
-                    );
-                  })
-                ) : (
-                  <span className="text-xs text-[#3D4148]/50 font-mono px-3 py-2">
-                    No contact information available
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {lightboxOpen && galleryUrls.length > 0 && (
-        <div
-          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-        >
-          <button
-            type="button"
-            onClick={() => setLightboxOpen(false)}
-            className="absolute top-4 right-4 text-white/80 hover:text-white p-2"
-            aria-label="Close"
-          >
-            <X size={28} />
-          </button>
-
-          {galleryUrls.length > 1 && (
-            <div className="absolute top-4 left-4 text-white/70 text-sm font-mono">
-              {activeIndex + 1} / {galleryUrls.length}
-            </div>
-          )}
-
-          {galleryUrls.length > 1 && activeIndex > 0 && (
-            <button
-              type="button"
-              onClick={showPrev}
-              className="absolute left-2 sm:left-6 text-white/80 hover:text-white p-2"
-              aria-label="Previous photo"
-            >
-              <ChevronLeft size={36} />
-            </button>
-          )}
-
-          <img
-            src={galleryUrls[activeIndex]}
-            alt={`${listing?.mineral || "Listing"} photo ${
-              activeIndex + 1
-            }`}
-            className="max-w-[92vw] max-h-[80vh] object-contain"
-          />
-
-          {galleryUrls.length > 1 &&
-            activeIndex < galleryUrls.length - 1 && (
-              <button
-                type="button"
-                onClick={showNext}
-                className="absolute right-2 sm:right-6 text-white/80 hover:text-white p-2"
-                aria-label="Next photo"
-              >
-                <ChevronRight size={36} />
-              </button>
-            )}
-        </div>
-      )}
-
-      {showRejectModal && (
-        <RejectListingModal
-          onClose={closeRejectModal}
-          onConfirm={confirmReject}
-        />
-      )}
-
-      {showEditModal && (
-        <EditListingModal
-          listing={listing}
-          existingPhotos={photos}
-          onClose={closeEditModal}
-          onSaved={handleEditSaved}
-        />
-      )}
-
-      {showExpressInterestModal && listing && (
-        <ExpressInterestModal
-          listingId={listing.id}
-          onClose={closeExpressInterestModal}
-          onSubmitted={handleInterestSubmitted}
-        />
-      )}
-    </div>
-  );
-}
