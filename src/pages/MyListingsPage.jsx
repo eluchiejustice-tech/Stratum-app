@@ -1,11 +1,30 @@
+// MyListingsPage.jsx
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Ban } from "lucide-react";
 import ListingCard from "../components/ListingCard";
 import { mapListingRow } from "../utils/mapListingRow";
-import { getListingsBySeller } from "../services/listings";
+import { getListingsBySeller, getListingEngagementDetail } from "../services/listings";
 import { useAuthContext } from "../context/AuthContext";
 
-function StatusSection({ title, note, icon: Icon, listings, onListingClick, onSellerClick }) {
+function EngagementLine({ engagement }) {
+  const e = engagement || {
+    views_all_time: 0,
+    views_last_7_days: 0,
+    contact_clicks_all_time: 0,
+    contact_clicks_last_7_days: 0,
+  };
+
+  return (
+    <div
+      className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 px-1 -mt-2 mb-3"
+      style={{ fontFamily: "system-ui, sans-serif" }}
+    >
+      Views: {e.views_all_time} (7d: {e.views_last_7_days}) · Contacts: {e.contact_clicks_all_time} (7d: {e.contact_clicks_last_7_days})
+    </div>
+  );
+}
+
+function StatusSection({ title, note, icon: Icon, listings, engagementByListing, onListingClick, onSellerClick }) {
   if (listings.length === 0) return null;
 
   return (
@@ -27,28 +46,25 @@ function StatusSection({ title, note, icon: Icon, listings, onListingClick, onSe
       )}
       <div className="space-y-3">
         {listings.map((l) => (
-          <ListingCard
-            key={l.id}
-            listing={l}
-            isAdmin={false}
-            onListingClick={onListingClick}
-            onSellerClick={onSellerClick}
-          />
+          <div key={l.id}>
+            <ListingCard
+              listing={l}
+              isAdmin={false}
+              onListingClick={onListingClick}
+              onSellerClick={onSellerClick}
+            />
+            <EngagementLine engagement={engagementByListing[l.id]} />
+          </div>
         ))}
       </div>
     </div>
   );
 }
 
-// `embedded`: when true, this renders as a section inside another page
-// (SellerDashboardPage) rather than as its own standalone screen — the
-// "Back to marketplace" button and page heading are suppressed, since the
-// parent page already provides its own back navigation and heading.
-// Everything else (data loading, grouping, ListingCard rendering) is
-// identical in both modes.
 export default function MyListingsPage({ onBack, onListingClick, onSellerClick, embedded = false }) {
   const { user } = useAuthContext();
   const [listings, setListings] = useState([]);
+  const [engagementByListing, setEngagementByListing] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -58,16 +74,28 @@ export default function MyListingsPage({ onBack, onListingClick, onSellerClick, 
     setLoading(true);
     setError(null);
 
-    const { data, error: fetchError } = await getListingsBySeller(user.id);
+    const [listingsRes, engagementRes] = await Promise.all([
+      getListingsBySeller(user.id),
+      getListingEngagementDetail(),
+    ]);
 
-    if (fetchError) {
-      console.error("Failed to load your listings", fetchError);
+    if (listingsRes.error) {
+      console.error("Failed to load your listings", listingsRes.error);
       setError(true);
       setLoading(false);
       return;
     }
 
-    setListings((data || []).map(mapListingRow));
+    setListings((listingsRes.data || []).map(mapListingRow));
+
+    if (!engagementRes.error) {
+      setEngagementByListing(
+        Object.fromEntries((engagementRes.data || []).map((row) => [row.listing_id, row]))
+      );
+    } else {
+      console.error("Failed to load listing engagement detail", engagementRes.error);
+    }
+
     setLoading(false);
   }, [user]);
 
@@ -122,12 +150,14 @@ export default function MyListingsPage({ onBack, onListingClick, onSellerClick, 
               title="Pending review"
               note="These listings are waiting for a moderator to verify them."
               listings={pending}
+              engagementByListing={engagementByListing}
               onListingClick={onListingClick}
               onSellerClick={onSellerClick}
             />
             <StatusSection
               title="Verified"
               listings={verified}
+              engagementByListing={engagementByListing}
               onListingClick={onListingClick}
               onSellerClick={onSellerClick}
             />
@@ -136,6 +166,7 @@ export default function MyListingsPage({ onBack, onListingClick, onSellerClick, 
               icon={Ban}
               note="This listing did not meet our verification requirements and isn't visible in the marketplace. Contact support for details, then submit a new listing once you've made corrections."
               listings={rejected}
+              engagementByListing={engagementByListing}
               onListingClick={onListingClick}
               onSellerClick={onSellerClick}
             />
