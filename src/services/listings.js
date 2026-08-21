@@ -1,3 +1,4 @@
+// services/listings.js
 import { supabase } from "./supabaseClient";
 
 const LISTING_COLUMNS =
@@ -363,6 +364,17 @@ export async function getVerifiedListingCountForMineral(mineral) {
 // of the underlying RPC.
 export async function getListingEngagementSummary() {
   return supabase.rpc("get_listing_engagement_summary");
+}
+
+// Per-listing engagement breakdown (Phase 7D Stage 2 detail view). Mirrors
+// getListingEngagementSummary's account-wide shape, but grouped by
+// listing_id. Like the summary RPC, this does no seller-scoping itself —
+// get_listing_engagement_detail() is SECURITY INVOKER, so RLS on
+// listing_view/contact_seller_click already restricts the underlying rows
+// to the caller's own listings (or all listings, for a moderator) before
+// this function ever aggregates them.
+export async function getListingEngagementDetail() {
+  return supabase.rpc("get_listing_engagement_detail");
 }
 
 // Phase 2 — Saved Listing Lifecycle Awareness. Returns minimal status
