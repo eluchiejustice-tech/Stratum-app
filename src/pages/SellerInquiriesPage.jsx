@@ -180,7 +180,7 @@ export default function SellerInquiriesPage({ onBack, onListingClick }) {
             className="text-center py-12 text-[#3D4148]/60"
             style={{ fontFamily: "system-ui, sans-serif" }}
           >
-            No buyer inquiries yet.
+            No seller inquiries yet.
           </div>
         )}
 
