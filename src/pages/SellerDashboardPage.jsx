@@ -8,6 +8,7 @@ import {
   Layers,
   Eye,
   Plus,
+  Inbox,
 } from "lucide-react";
 import MyListingsPage from "./MyListingsPage";
 import MarketSnapshotSection from "../components/intelligence/MarketSnapshotSection";
@@ -50,7 +51,7 @@ function formatDate(isoString) {
   });
 }
 
-export default function SellerDashboardPage({ onBack, onListingClick, onSellerClick, onMarketIntelligence }) {
+export default function SellerDashboardPage({ onBack, onListingClick, onSellerClick, onMarketIntelligence, onSellerInquiries }) {
   const { user } = useAuthContext();
 
   const [loading, setLoading] = useState(true);
@@ -392,6 +393,12 @@ export default function SellerDashboardPage({ onBack, onListingClick, onSellerCl
                 className="flex items-center gap-1.5 bg-[#B8922F] text-[#15130F] font-mono text-xs uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition"
               >
                 <Plus size={14} strokeWidth={2.5} /> New listing
+              </button>
+              <button
+                onClick={onSellerInquiries}
+                className="flex items-center gap-1.5 bg-[#B8922F] text-[#15130F] font-mono text-xs uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition mt-2"
+              >
+                <Inbox size={14} strokeWidth={2.5} /> Your inquiries
               </button>
             </div>
 
