@@ -253,7 +253,7 @@ export default function BuyerInquiriesPage({ onBack, onListingClick }) {
                     {isExpanded ? "Hide conversation" : "View conversation"}
                   </button>
 
-                  {isExpanded && <MessageThread interestId={inquiry.id} />}
+                  {isExpanded && <MessageThread interestId={inquiry.id} status={inquiry.status} />}
 
                   {rowError[inquiry.id] && (
                     <p className="text-xs text-[#8a3b3b] mt-2 mb-2">{rowError[inquiry.id]}</p>
