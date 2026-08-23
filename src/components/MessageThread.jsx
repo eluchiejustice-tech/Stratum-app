@@ -27,7 +27,13 @@ function formatTimestamp(isoString) {
 // no edit/delete. Sending re-fetches the full thread rather than
 // optimistically appending, keeping this component simple and always
 // consistent with what the database actually holds.
-export default function MessageThread({ interestId }) {
+//
+// `status` (optional) — the parent buyer_interest's current status.
+// When status === "withdrawn", history remains fully visible but the
+// compose box is not rendered at all, per product decision: withdrawal
+// ends new communication on a thread while preserving its history.
+// RLS/database behavior is unchanged — this is a UI-only guard.
+export default function MessageThread({ interestId, status }) {
   const { user } = useAuthContext();
 
   const [messages, setMessages] = useState([]);
@@ -37,6 +43,8 @@ export default function MessageThread({ interestId }) {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(null);
+
+  const isWithdrawn = status === "withdrawn";
 
   const loadMessages = useCallback(async () => {
     if (!interestId) return;
@@ -64,6 +72,9 @@ export default function MessageThread({ interestId }) {
     // UI-level guard against empty/whitespace submissions — the service
     // layer and the database NOT NULL constraint both also enforce this
     // independently; this is purely to avoid a pointless round trip.
+    // Also guards against sending on a withdrawn thread, defense-in-depth
+    // alongside the compose box simply not being rendered in that state.
+    if (isWithdrawn) return;
     const trimmed = draft.trim();
     if (!trimmed || sending) return;
 
@@ -155,30 +166,41 @@ export default function MessageThread({ interestId }) {
         </div>
       )}
 
-      {sendError && (
-        <p className="text-xs text-[#8a3b3b] mb-2">{sendError}</p>
-      )}
-
-      <div className="flex items-end gap-2">
-        <textarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={handleKeyDown}
-          rows={1}
-          placeholder="Write a message…"
-          disabled={sending}
-          className="flex-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm resize-none disabled:opacity-50"
+      {isWithdrawn ? (
+        <p
+          className="text-xs text-[#3D4148]/50 text-center py-2"
           style={{ fontFamily: "system-ui, sans-serif" }}
-        />
-        <button
-          onClick={handleSend}
-          disabled={sending || !draft.trim()}
-          className="flex items-center gap-1.5 bg-[#B8922F] text-[#15130F] font-mono text-xs uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
         >
-          <Send size={14} strokeWidth={2.5} />
-          {sending ? "Sending…" : "Send"}
-        </button>
-      </div>
+          This inquiry was withdrawn — conversation is read-only.
+        </p>
+      ) : (
+        <>
+          {sendError && (
+            <p className="text-xs text-[#8a3b3b] mb-2">{sendError}</p>
+          )}
+
+          <div className="flex items-end gap-2">
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={handleKeyDown}
+              rows={1}
+              placeholder="Write a message…"
+              disabled={sending}
+              className="flex-1 bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm resize-none disabled:opacity-50"
+              style={{ fontFamily: "system-ui, sans-serif" }}
+            />
+            <button
+              onClick={handleSend}
+              disabled={sending || !draft.trim()}
+              className="flex items-center gap-1.5 bg-[#B8922F] text-[#15130F] font-mono text-xs uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            >
+              <Send size={14} strokeWidth={2.5} />
+              {sending ? "Sending…" : "Send"}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
