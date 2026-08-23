@@ -162,7 +162,7 @@ export default function SellerInquiriesPage({ onBack, onListingClick }) {
         </button>
 
         <h1 className="font-serif text-2xl mb-6 flex items-center gap-2">
-          <Inbox size={20} /> Buyer inquiries
+          <Inbox size={20} /> Seller inquiries
         </h1>
 
         {loading && (
