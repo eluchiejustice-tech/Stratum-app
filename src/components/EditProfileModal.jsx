@@ -1,17 +1,36 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { updateProfile } from "../services/profiles";
+import { updateProfile, getOwnContact } from "../services/profiles";
 import RoleSelect from "./RoleSelect";
 
 export default function EditProfileModal({ userId, profile, onClose, onSaved }) {
   const [name, setName] = useState(profile?.name || "");
   const [company, setCompany] = useState(profile?.company || "");
   const [bio, setBio] = useState(profile?.bio || "");
-  const [contact, setContact] = useState(profile?.contact || "");
+  const [contact, setContact] = useState("");
+  const [contactLoading, setContactLoading] = useState(true);
   const [location, setLocation] = useState(profile?.location || "");
   const [role, setRole] = useState(profile?.role || "buyer");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Contact is no longer part of the routine AuthContext profile object
+  // (see services/auth.js getProfile) — fetched here specifically, once,
+  // via the dedicated get_own_contact() RPC, hardcoded server-side to
+  // the caller's own row.
+  useEffect(() => {
+    let active = true;
+    getOwnContact().then(({ data, error: fetchError }) => {
+      if (!active) return;
+      if (!fetchError) {
+        setContact(data || "");
+      }
+      setContactLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleSave = async () => {
     setError("");
@@ -96,8 +115,9 @@ export default function EditProfileModal({ userId, profile, onClose, onSaved }) 
           type="text"
           value={contact}
           onChange={(e) => setContact(e.target.value)}
-          placeholder="Phone, WhatsApp link, or email"
-          className="w-full bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm mb-3"
+          placeholder={contactLoading ? "Loading…" : "Phone, WhatsApp link, or email"}
+          disabled={contactLoading}
+          className="w-full bg-white border border-[#3D4148]/20 rounded px-3 py-2 text-sm mb-3 disabled:opacity-50"
         />
 
         <label className="block text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/60 mb-1">
@@ -117,7 +137,7 @@ export default function EditProfileModal({ userId, profile, onClose, onSaved }) 
 
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || contactLoading}
           className="w-full mt-4 bg-[#15130F] text-[#EDE8DC] font-mono text-sm uppercase tracking-wide py-2.5 rounded hover:bg-[#3D4148] transition disabled:opacity-50"
         >
           {saving ? "Saving..." : "Save profile"}
