@@ -36,3 +36,10 @@ export async function updateProfile(id, updates) {
     .select()
     .single();
 }
+// Dedicated read for EditProfileModal only. Wraps get_own_contact(),
+// which takes no parameters and is hardcoded server-side to auth.uid() —
+// this can never be used to fetch anyone else's contact value, by
+// construction, not just by convention.
+export async function getOwnContact() {
+  return supabase.rpc("get_own_contact");
+}
