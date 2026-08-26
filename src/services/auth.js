@@ -54,3 +54,13 @@ export async function updatePassword(newPassword) {
     password: newPassword,
   });
 }
+
+// Resends the signup confirmation email. Separate from
+// requestPasswordReset, which handles password recovery specifically —
+// this uses Supabase's generic resend mechanism scoped to type: "signup".
+export async function resendVerification(email) {
+  return supabase.auth.resend({
+    type: "signup",
+    email,
+  });
+}
