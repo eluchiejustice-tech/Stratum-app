@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { X, Eye, EyeOff } from "lucide-react";
-import { signIn, signUp, requestPasswordReset } from "../services/auth";
+import { signIn, signUp, requestPasswordReset, resendVerification } from "../services/auth";
 import RoleSelect from "./RoleSelect";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -28,6 +28,11 @@ export default function LoginForm({ onClose, onSuccess }) {
   const [showSignupConfirm, setShowSignupConfirm] = useState(false);
   const [signupBlockedExisting, setSignupBlockedExisting] = useState(false);
 
+  // Resend verification — scoped to the signup-success state only.
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendError, setResendError] = useState("");
+  const [resendSuccess, setResendSuccess] = useState(false);
+
   // Forgot password state
   const [resetEmail, setResetEmail] = useState("");
   const [resetError, setResetError] = useState("");
@@ -35,6 +40,7 @@ export default function LoginForm({ onClose, onSuccess }) {
   const [resetSent, setResetSent] = useState(false);
 
   const handleLogin = async () => {
+    if (loading) return;
     setLoginError("");
     if (!email || !password) {
       setLoginError("Enter your email and password.");
@@ -54,6 +60,7 @@ export default function LoginForm({ onClose, onSuccess }) {
   };
 
   const handleSignup = async () => {
+    if (signupLoading) return;
     setSignupError("");
     setSignupBlockedExisting(false);
 
@@ -92,7 +99,7 @@ export default function LoginForm({ onClose, onSuccess }) {
 
     if (alreadyRegistered) {
       setSignupError(
-        "We couldn't create a new account with this email. If you've registered before, please sign in instead. If you're unsure, you'll be able to reset your password once that feature is available."
+        "We couldn't create a new account with this email. If you've registered before, please log in instead, or use \"Forgot password\" if you don't remember your password."
       );
       setSignupBlockedExisting(true);
       return;
@@ -101,7 +108,32 @@ export default function LoginForm({ onClose, onSuccess }) {
     setSignupSuccess(true);
   };
 
+  // Deliberately generic wording either way — mirrors the same
+  // anti-enumeration reasoning already used for password reset: we don't
+  // want a resend attempt to confirm or deny whether a given email has
+  // an account, confirmed or not.
+  const handleResendVerification = async () => {
+    if (resendLoading) return;
+    setResendError("");
+
+    const trimmedEmail = signupEmail.trim();
+    if (!trimmedEmail) return;
+
+    setResendLoading(true);
+    const { error } = await resendVerification(trimmedEmail);
+    setResendLoading(false);
+
+    if (error) {
+      console.error("Resend verification error", error);
+      setResendError("We couldn't resend the email right now. Please try again shortly.");
+      return;
+    }
+
+    setResendSuccess(true);
+  };
+
   const handleRequestReset = async () => {
+    if (resetLoading) return;
     setResetError("");
 
     const trimmedEmail = resetEmail.trim();
@@ -316,6 +348,26 @@ export default function LoginForm({ onClose, onSuccess }) {
             <p className="text-sm text-[#15130F] mb-3">
               Check your email to confirm your account, then log in.
             </p>
+
+            {resendSuccess ? (
+              <p className="text-xs text-[#1F4D3D] mb-3">
+                If your account exists and isn't confirmed yet, a new verification email has been sent.
+              </p>
+            ) : (
+              <>
+                <button
+                  onClick={handleResendVerification}
+                  disabled={resendLoading}
+                  className="text-xs underline text-[#3D4148] hover:text-[#15130F] disabled:opacity-50 mb-1"
+                >
+                  {resendLoading ? "Resending…" : "Resend verification email"}
+                </button>
+                {resendError && (
+                  <p className="text-xs text-[#8a3b3b] mb-3 font-mono">{resendError}</p>
+                )}
+              </>
+            )}
+
             <button
               onClick={() => {
                 setSignupSuccess(false);
