@@ -5,13 +5,20 @@ import { signOut } from "../services/auth";
 import LoginForm from "./LoginForm";
 import EditProfileModal from "./EditProfileModal";
 
-const LISTING_ROLES = ["miner_supplier", "company", "professional", "mineral_agent", "moderator"];
+const LISTING_ROLES = ["miner_supplier", "company", "mineral_agent", "moderator"];
 
 // "My dashboard" is role-aware: sellers (canCreateListings) land on
 // SellerDashboardPage, which is now their single operational hub —
 // Listings Management lives inside it, so the separate "My listings"
 // button has been removed to avoid two navigation paths to the same
 // content. Everyone else continues to BuyerDashboardPage, unchanged.
+//
+// "professional" (Geologist / Professional) deliberately excluded from
+// LISTING_ROLES as of the public-launch role-routing review — this role
+// should not be automatically treated as a seller. Lands on "My
+// dashboard" (BuyerDashboardPage) for now; a dedicated Professional
+// experience is a separate future product phase, not part of this
+// launch-hardening pass.
 //
 // "Market Intelligence" (Phase 7) is deliberately NOT gated behind
 // !loading && user — it's a public, evidence-backed destination meant
