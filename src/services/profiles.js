@@ -27,15 +27,25 @@ export async function getApprovedListingsBySeller(sellerId) {
 // miner_supplier, professional, company, mineral_agent). Attempting to set
 // role to "moderator" is still rejected — independently enforced by the
 // same RLS policy's WITH CHECK clause, regardless of what a client sends.
+//
+// The trailing .select() is deliberately scoped to the 8 non-sensitive
+// columns rather than a bare select(*) — this query runs as the caller
+// (RLS/grant-scoped, not SECURITY DEFINER), and once `authenticated`'s
+// table-wide SELECT on profiles is replaced with an explicit column-level
+// grant (contact-hardening migration), an unscoped select() here would
+// fail even for the user's own row, since column-level grants aren't
+// row-aware. Contact itself is still written correctly via the update
+// payload above — only the read-back afterward is restricted.
 export async function updateProfile(id, updates) {
   const { name, company, bio, contact, location, role } = updates;
   return supabase
     .from("profiles")
     .update({ name, company, bio, contact, location, role })
     .eq("id", id)
-    .select()
+    .select("id, name, role, company, bio, location, verification_status, created_at")
     .single();
 }
+
 // Dedicated read for EditProfileModal only. Wraps get_own_contact(),
 // which takes no parameters and is hardcoded server-side to auth.uid() —
 // this can never be used to fetch anyone else's contact value, by
