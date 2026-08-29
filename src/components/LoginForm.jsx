@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { X, Eye, EyeOff } from "lucide-react";
-import { signIn, signUp, requestPasswordReset, resendVerification, signInWithGoogle } from "../services/auth";
+import { signIn, signUp, requestPasswordReset, resendVerification, signInWithGoogle, signInWithFacebook } from "../services/auth";
 import RoleSelect from "./RoleSelect";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -246,6 +246,13 @@ export default function LoginForm({ onClose, onSuccess }) {
               className="w-full mt-2 flex items-center justify-center gap-2 bg-white text-[#15130F] font-mono text-sm uppercase tracking-wide py-2.5 rounded border border-[#3D4148]/20 hover:brightness-95 transition"
             >
               Continue with Google
+            </button>
+
+            <button
+              onClick={() => signInWithFacebook()}
+              className="w-full mt-2 flex items-center justify-center gap-2 bg-[#1877F2] text-white font-mono text-sm uppercase tracking-wide py-2.5 rounded border border-[#1877F2] hover:brightness-95 transition"
+            >
+              Continue with Facebook
             </button>
 
             <p className="text-xs text-[#3D4148] mt-3 text-center">
