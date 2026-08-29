@@ -17,6 +17,15 @@ export async function signIn(email, password) {
   return supabase.auth.signInWithPassword({ email, password });
 }
 
+export async function signInWithGoogle() {
+  return supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: "https://stratum-app-nrdl.vercel.app",
+    },
+  });
+}
+
 export async function signOut() {
   return supabase.auth.signOut();
 }
