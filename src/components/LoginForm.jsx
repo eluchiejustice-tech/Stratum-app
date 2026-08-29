@@ -153,9 +153,11 @@ export default function LoginForm({ onClose, onSuccess }) {
     // it without compromising the anti-enumeration guarantee.
     if (error) {
       console.error("Password reset request error", error);
-      setResetError(
-        "We couldn't process your request right now. Please check your internet connection and try again."
-      );
+      if (error?.code === "over_email_send_rate_limit" || error?.status === 429) {
+        setResetError("Too many reset requests. Please wait a few minutes and try again.");
+      } else {
+        setResetError("We couldn't process your request right now. Please try again in a moment.");
+      }
       return;
     }
 
