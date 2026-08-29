@@ -26,6 +26,15 @@ export async function signInWithGoogle() {
   });
 }
 
+export async function signInWithFacebook() {
+  return supabase.auth.signInWithOAuth({
+    provider: "facebook",
+    options: {
+      redirectTo: "https://stratum-app-nrdl.vercel.app",
+    },
+  });
+}
+
 export async function signOut() {
   return supabase.auth.signOut();
 }
