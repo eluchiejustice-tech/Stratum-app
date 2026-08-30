@@ -83,6 +83,16 @@ export default function AddListingModal({ onClose, onAdd }) {
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docUploadError, setDocUploadError] = useState("");
 
+  // Submission lifecycle state — separate from the per-field upload
+  // states above. `submitting` covers the actual createListing() call
+  // (and its attached photos/document inserts, handled inside onAdd);
+  // `submitSuccess` briefly shows a confirmation banner before the modal
+  // closes itself; `submitError` keeps the modal open with entered data
+  // intact so the user can retry without re-filling the form.
+  const [submitting, setSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
   // Derived from the verified geographic dataset. `states` is always in
   // sync with AFRICA_LOCATIONS.Nigeria; `lgas` is empty until a state is
   // selected, then holds that state's verified { name, headquarters,
@@ -202,17 +212,25 @@ export default function AddListingModal({ onClose, onAdd }) {
 
   const anyPhotoUploading = photos.some((p) => p.uploading);
 
-  const submit = () => {
+  const submit = async () => {
+    // Guards against duplicate submissions: a second click while a
+    // request is already in flight, or before photo/document uploads
+    // have settled, is a no-op rather than firing another createListing().
+    if (submitting) return;
+
     const validationErrors = validate(form, photos, customMineral);
     setErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) return;
     if (anyPhotoUploading || uploadingDoc) return;
 
+    setSubmitting(true);
+    setSubmitError("");
+
     const quantity = `${form.quantityAmount.trim()} ${form.quantityUnit}`;
     const mineral = form.mineral === "Other" ? customMineral.trim() : form.mineral;
 
-    onAdd({
+    const result = await onAdd({
       mineral,
       grade: form.grade.trim(),
       quantity,
@@ -229,8 +247,30 @@ export default function AddListingModal({ onClose, onAdd }) {
         .sort((a, b) => a.position - b.position)
         .map((p) => ({ url: p.url, storagePath: p.storagePath, position: p.position })),
     });
-    onClose();
+
+    if (result?.error) {
+      console.error("Listing submission failed", result.error);
+      setSubmitting(false);
+      setSubmitError("We couldn't submit your listing right now. Please try again.");
+      return;
+    }
+
+    // Success: show a brief confirmation inside the modal before closing,
+    // rather than closing instantly — gives the user visible confirmation
+    // that the submission actually went through.
+    setSubmitting(false);
+    setSubmitSuccess(true);
+    setTimeout(() => {
+      onClose();
+    }, 1200);
   };
+
+  const submitDisabled = anyPhotoUploading || uploadingDoc || submitting || submitSuccess;
+
+  let submitLabel = "Submit for review";
+  if (anyPhotoUploading || uploadingDoc) submitLabel = "Uploading…";
+  else if (submitting) submitLabel = "Submitting…";
+  else if (submitSuccess) submitLabel = "Submitted";
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
@@ -508,12 +548,25 @@ export default function AddListingModal({ onClose, onAdd }) {
             )}
           </div>
         </div>
+
+        {submitError && (
+          <p className="text-sm font-medium text-[#8a3b3b] bg-[#8a3b3b]/10 border border-[#8a3b3b]/30 rounded px-3 py-2 mt-4">
+            {submitError}
+          </p>
+        )}
+
+        {submitSuccess && (
+          <p className="text-sm font-medium text-[#1F4D3D] bg-[#1F4D3D]/10 border border-[#1F4D3D]/30 rounded px-3 py-2 mt-4">
+            Listing submitted successfully ✓
+          </p>
+        )}
+
         <button
           onClick={submit}
-          disabled={anyPhotoUploading || uploadingDoc}
+          disabled={submitDisabled}
           className="w-full mt-5 bg-[#15130F] text-[#EDE8DC] font-mono text-sm uppercase tracking-wide py-3 rounded hover:bg-[#3D4148] transition disabled:opacity-50"
         >
-          {anyPhotoUploading || uploadingDoc ? "Uploading…" : "Submit for review"}
+          {submitLabel}
         </button>
         <p className="text-xs text-[#3D4148]/70 mt-2 text-center">
           New listings show as "Pending review" until your team verifies them.
