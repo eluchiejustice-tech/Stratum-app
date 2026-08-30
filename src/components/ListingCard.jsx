@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { MapPin, Image as ImageIcon, MessageCircle, Phone, Mail, Check, Bookmark, BookmarkCheck } from "lucide-react";
 import CoreSample from "./CoreSample";
 import VerifiedBadge from "./VerifiedBadge";
+import MediaViewerModal from "./MediaViewerModal";
 import { getContactOptions } from "../utils/contactHref";
 import { logContactSellerClick } from "../services/buyerInterest";
 
@@ -25,6 +27,8 @@ export default function ListingCard({
   const canOpenSellerProfile = Boolean(onSellerClick && l.sellerId);
   const canOpenListingDetail = Boolean(onListingClick && l.id);
   const contactOptions = isAuthenticated ? getContactOptions(l.contact) : [];
+
+  const [showPhotoViewer, setShowPhotoViewer] = useState(false);
 
   return (
     <div className="bg-white rounded-lg p-4 flex gap-4 shadow-sm border border-[#3D4148]/10">
@@ -71,14 +75,13 @@ export default function ListingCard({
             <MapPin size={11} /> {l.location}
           </span>
           {l.photoUrl && (
-            <a
-              href={l.photoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={() => setShowPhotoViewer(true)}
               className="flex items-center gap-1 text-[#1F4D3D] underline"
             >
               <ImageIcon size={11} /> Photo/report
-            </a>
+            </button>
           )}
         </div>
         <div className="flex items-center justify-between mt-3">
@@ -136,6 +139,19 @@ export default function ListingCard({
           </div>
         </div>
       </div>
+
+      {showPhotoViewer && l.photoUrl && (
+        <MediaViewerModal
+          onClose={() => setShowPhotoViewer(false)}
+          label={`${l.mineral} photo`}
+        >
+          <img
+            src={l.photoUrl}
+            alt={`${l.mineral} photo`}
+            className="max-w-full max-h-full object-contain rounded"
+          />
+        </MediaViewerModal>
+      )}
     </div>
   );
 }
