@@ -125,6 +125,10 @@ export default function SellerDashboardPage({ onBack, onListingClick, onSellerCl
   // same upload-failure handling) — duplicated deliberately rather than
   // shared, consistent with this page owning its own modal state rather
   // than reaching into MarketplacePage's.
+  //
+  // Returns { error } so AddListingModal knows whether the submission
+  // actually succeeded before it closes itself — previously this
+  // function's return value was ignored entirely by the caller.
   const addListing = async (form) => {
     const payload = {
       seller_id: user.id,
@@ -148,7 +152,7 @@ export default function SellerDashboardPage({ onBack, onListingClick, onSellerCl
     const { data: newListing, error: insertError } = await createListing(payload);
     if (insertError) {
       console.error("Failed to create listing", insertError);
-      return;
+      return { error: insertError };
     }
 
     let photosFailed = false;
@@ -183,6 +187,7 @@ export default function SellerDashboardPage({ onBack, onListingClick, onSellerCl
     }
 
     await loadDashboard();
+    return { error: null };
   };
 
   const rejectedListings = identifiers.filter((l) => l.status === "rejected");
