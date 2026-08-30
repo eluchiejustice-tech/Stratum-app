@@ -95,7 +95,7 @@ export default function MarketplacePage({
     const { data: newListing, error: insertError } = await createListing(payload);
     if (insertError) {
       console.error("Failed to create listing", insertError);
-      return;
+      return { error: insertError };
     }
 
     let photosFailed = false;
@@ -130,6 +130,7 @@ export default function MarketplacePage({
     }
 
     await refresh();
+    return { error: null };
   };
 
   const verifyListing = async (id) => {
