@@ -9,10 +9,13 @@ import {
   Eye,
   Plus,
   Inbox,
+  UserCog,
 } from "lucide-react";
 import MyListingsPage from "./MyListingsPage";
 import MarketSnapshotSection from "../components/intelligence/MarketSnapshotSection";
 import AddListingModal from "../components/AddListingModal";
+import EditProfileModal from "../components/EditProfileModal";
+import Skeleton from "../components/Skeleton";
 import { useAuthContext } from "../context/AuthContext";
 import { getProfileById } from "../services/profiles";
 import {
@@ -27,9 +30,7 @@ import {
 } from "../services/listings";
 
 // Fields a seller can fill in via Edit Profile — used only to compute a
-// completion percentage here. Profile editing itself is deliberately not
-// duplicated on this page; Header's existing "Edit profile" button
-// remains the single entry point, per product decision.
+// completion percentage here.
 const PROFILE_COMPLETION_FIELDS = ["name", "company", "bio", "contact", "location"];
 
 function computeProfileCompletion(profile) {
@@ -51,8 +52,39 @@ function formatDate(isoString) {
   });
 }
 
+// Full-page skeleton, loosely mirroring the real dashboard's section
+// order and rough proportions: needs-attention banner, four summary
+// cards, a lifecycle bar, an engagement bar, and a couple of listing-row
+// placeholders. Not pixel-exact — just enough shape that the page
+// doesn't visually "pop" once real data replaces it.
+function SellerDashboardSkeleton() {
+  return (
+    <div>
+      <Skeleton className="h-16 w-full mb-6" />
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-20 w-full" />
+        ))}
+      </div>
+
+      <Skeleton className="h-14 w-full mb-6" />
+      <Skeleton className="h-14 w-full mb-6" />
+      <Skeleton className="h-24 w-full mb-6" />
+
+      <div className="bg-white rounded-lg p-5 shadow-sm border border-[#3D4148]/10">
+        <Skeleton className="h-4 w-32 mb-4" />
+        <div className="space-y-3">
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SellerDashboardPage({ onBack, onListingClick, onSellerClick, onMarketIntelligence, onSellerInquiries }) {
-  const { user } = useAuthContext();
+  const { user, refreshProfile } = useAuthContext();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -65,6 +97,7 @@ export default function SellerDashboardPage({ onBack, onListingClick, onSellerCl
   const [engagement, setEngagement] = useState(null);
 
   const [showAdd, setShowAdd] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
   const [uploadWarning, setUploadWarning] = useState(null);
 
   // This page owns its own AddListingModal state, separate from
@@ -121,14 +154,19 @@ export default function SellerDashboardPage({ onBack, onListingClick, onSellerCl
     setShowAdd(true);
   };
 
+  const handleProfileSaved = async () => {
+    setShowEditProfile(false);
+    await refreshProfile();
+    await loadDashboard();
+  };
+
   // Mirrors MarketplacePage's addListing exactly (same payload shape,
   // same upload-failure handling) — duplicated deliberately rather than
   // shared, consistent with this page owning its own modal state rather
   // than reaching into MarketplacePage's.
   //
   // Returns { error } so AddListingModal knows whether the submission
-  // actually succeeded before it closes itself — previously this
-  // function's return value was ignored entirely by the caller.
+  // actually succeeded before it closes itself.
   const addListing = async (form) => {
     const payload = {
       seller_id: user.id,
@@ -244,9 +282,7 @@ export default function SellerDashboardPage({ onBack, onListingClick, onSellerCl
 
         <h1 className="font-serif text-2xl mb-6">Seller dashboard</h1>
 
-        {loading && (
-          <div className="text-center py-12 text-[#3D4148]/60">Loading your dashboard…</div>
-        )}
+        {loading && <SellerDashboardSkeleton />}
 
         {!loading && error && (
           <div className="text-center py-12 text-[#8a3b3b]">
@@ -393,18 +429,26 @@ export default function SellerDashboardPage({ onBack, onListingClick, onSellerCl
               <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-3">
                 Quick actions
               </div>
-              <button
-                onClick={openAddListing}
-                className="flex items-center gap-1.5 bg-[#B8922F] text-[#15130F] font-mono text-xs uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition"
-              >
-                <Plus size={14} strokeWidth={2.5} /> New listing
-              </button>
-              <button
-                onClick={onSellerInquiries}
-                className="flex items-center gap-1.5 bg-[#B8922F] text-[#15130F] font-mono text-xs uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition mt-2"
-              >
-                <Inbox size={14} strokeWidth={2.5} /> Your inquiries
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={openAddListing}
+                  className="flex items-center gap-1.5 bg-[#B8922F] text-[#15130F] font-mono text-xs uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition"
+                >
+                  <Plus size={14} strokeWidth={2.5} /> New listing
+                </button>
+                <button
+                  onClick={onSellerInquiries}
+                  className="flex items-center gap-1.5 bg-[#B8922F] text-[#15130F] font-mono text-xs uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition"
+                >
+                  <Inbox size={14} strokeWidth={2.5} /> Your inquiries
+                </button>
+                <button
+                  onClick={() => setShowEditProfile(true)}
+                  className="flex items-center gap-1.5 bg-[#B8922F] text-[#15130F] font-mono text-xs uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition"
+                >
+                  <UserCog size={14} strokeWidth={2.5} /> Edit profile
+                </button>
+              </div>
             </div>
 
             {/* Listings Management — embedded, replaces the old standalone
@@ -423,6 +467,15 @@ export default function SellerDashboardPage({ onBack, onListingClick, onSellerCl
 
       {showAdd && (
         <AddListingModal onClose={() => setShowAdd(false)} onAdd={addListing} />
+      )}
+
+      {showEditProfile && user && (
+        <EditProfileModal
+          userId={user.id}
+          profile={profile}
+          onClose={() => setShowEditProfile(false)}
+          onSaved={handleProfileSaved}
+        />
       )}
     </div>
   );
