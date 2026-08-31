@@ -1,7 +1,9 @@
 // BuyerDashboardPage.jsx
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Bookmark, Heart, MapPin, ShieldCheck, BookmarkCheck, Inbox } from "lucide-react";
+import { ArrowLeft, Bookmark, Heart, MapPin, ShieldCheck, BookmarkCheck, Inbox, UserCog } from "lucide-react";
 import ListingCard from "../components/ListingCard";
+import EditProfileModal from "../components/EditProfileModal";
+import Skeleton from "../components/Skeleton";
 import { mapListingRow } from "../utils/mapListingRow";
 import { getSavedListings, saveListing, unsaveListing } from "../services/savedListings";
 import { getFavouriteSellers, unfavouriteSeller } from "../services/favouriteSellers";
@@ -91,8 +93,40 @@ function FavouriteSellerCard({ profile, onSellerClick, onRemove }) {
   );
 }
 
+// Skeleton loosely mirroring ListingCard's shape: an image-sized block
+// on the left, a title line, a subtitle line, and a bottom row for
+// quantity/location. No real data — purely placeholder geometry.
+function SavedListingSkeletonCard() {
+  return (
+    <div className="bg-white rounded-lg p-4 flex gap-4 shadow-sm border border-[#3D4148]/10">
+      <Skeleton className="w-16 h-20 shrink-0" />
+      <div className="flex-1 min-w-0 space-y-2">
+        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="h-3 w-1/3" />
+        <div className="flex gap-3 mt-3">
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="h-3 w-24" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Skeleton loosely mirroring FavouriteSellerCard's shape.
+function FavouriteSellerSkeletonCard() {
+  return (
+    <div className="bg-white rounded-lg p-4 flex items-start justify-between gap-3 shadow-sm border border-[#3D4148]/10">
+      <div className="flex-1 min-w-0 space-y-2">
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-3 w-1/3" />
+      </div>
+      <Skeleton className="w-4 h-4 shrink-0 rounded-full" />
+    </div>
+  );
+}
+
 export default function BuyerDashboardPage({ onBack, onListingClick, onSellerClick, onBuyerInquiries }) {
-  const { user } = useAuthContext();
+  const { user, profile, refreshProfile } = useAuthContext();
 
   const [savedListings, setSavedListings] = useState([]);
   const [savedListingIds, setSavedListingIds] = useState(new Set());
@@ -103,6 +137,8 @@ export default function BuyerDashboardPage({ onBack, onListingClick, onSellerCli
   const [favouriteSellers, setFavouriteSellers] = useState([]);
   const [favouritesLoading, setFavouritesLoading] = useState(true);
   const [favouritesError, setFavouritesError] = useState(null);
+
+  const [showEditProfile, setShowEditProfile] = useState(false);
 
   const loadSavedListings = useCallback(async () => {
     if (!user) return;
@@ -246,19 +282,27 @@ export default function BuyerDashboardPage({ onBack, onListingClick, onSellerCli
 
         <h1 className="font-serif text-2xl mb-6">My dashboard</h1>
 
-        {onBuyerInquiries && (
-          <div className="bg-white rounded-lg p-5 shadow-sm border border-[#3D4148]/10 mb-6">
-            <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-3">
-              Quick actions
-            </div>
+        <div className="bg-white rounded-lg p-5 shadow-sm border border-[#3D4148]/10 mb-6">
+          <div className="text-[10px] font-mono uppercase tracking-wide text-[#3D4148]/50 mb-3">
+            Quick actions
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {onBuyerInquiries && (
+              <button
+                onClick={onBuyerInquiries}
+                className="flex items-center gap-1.5 bg-[#B8922F] text-[#15130F] font-mono text-xs uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition"
+              >
+                <Inbox size={14} strokeWidth={2.5} /> Your inquiries
+              </button>
+            )}
             <button
-              onClick={onBuyerInquiries}
+              onClick={() => setShowEditProfile(true)}
               className="flex items-center gap-1.5 bg-[#B8922F] text-[#15130F] font-mono text-xs uppercase tracking-wide px-3 py-2 rounded hover:brightness-110 transition"
             >
-              <Inbox size={14} strokeWidth={2.5} /> Your inquiries
+              <UserCog size={14} strokeWidth={2.5} /> Edit profile
             </button>
           </div>
-        )}
+        </div>
 
         <div className="mb-10">
           <div className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wide text-[#3D4148]/60 mb-3">
@@ -266,7 +310,10 @@ export default function BuyerDashboardPage({ onBack, onListingClick, onSellerCli
           </div>
 
           {savedLoading && (
-            <div className="text-center py-8 text-[#3D4148]/60">Loading saved listings…</div>
+            <div className="space-y-3">
+              <SavedListingSkeletonCard />
+              <SavedListingSkeletonCard />
+            </div>
           )}
 
           {!savedLoading && savedError && (
@@ -320,7 +367,10 @@ export default function BuyerDashboardPage({ onBack, onListingClick, onSellerCli
           </div>
 
           {favouritesLoading && (
-            <div className="text-center py-8 text-[#3D4148]/60">Loading favourite sellers…</div>
+            <div className="space-y-3">
+              <FavouriteSellerSkeletonCard />
+              <FavouriteSellerSkeletonCard />
+            </div>
           )}
 
           {!favouritesLoading && favouritesError && (
@@ -352,6 +402,15 @@ export default function BuyerDashboardPage({ onBack, onListingClick, onSellerCli
           )}
         </div>
       </div>
+
+      {showEditProfile && user && (
+        <EditProfileModal
+          userId={user.id}
+          profile={profile}
+          onClose={() => setShowEditProfile(false)}
+          onSaved={refreshProfile}
+        />
+      )}
     </div>
   );
 }
