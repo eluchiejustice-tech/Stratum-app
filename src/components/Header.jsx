@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { Layers, Plus, Lock, Shield, LogOut, UserCog, LayoutDashboard, TrendingUp } from "lucide-react";
+import { Layers, Plus, Lock, Shield, LogOut, LayoutDashboard, TrendingUp } from "lucide-react";
 import { useAuthContext } from "../context/AuthContext";
 import { signOut } from "../services/auth";
 import LoginForm from "./LoginForm";
-import EditProfileModal from "./EditProfileModal";
 
 const LISTING_ROLES = ["miner_supplier", "company", "mineral_agent", "moderator"];
 
@@ -23,10 +22,14 @@ const LISTING_ROLES = ["miner_supplier", "company", "mineral_agent", "moderator"
 // "Market Intelligence" (Phase 7) is deliberately NOT gated behind
 // !loading && user — it's a public, evidence-backed destination meant
 // for anonymous visitors, buyers, sellers, and moderators alike.
+//
+// Edit Profile was removed from this homepage header as part of the
+// Stratum polish pass — it now lives inside both BuyerDashboardPage.jsx
+// and SellerDashboardPage.jsx's Quick Actions, each reusing the same
+// EditProfileModal. This file no longer renders that modal at all.
 export default function Header({ onAddListing, onSellerDashboard, onBuyerDashboard, onMarketIntelligence }) {
-  const { user, profile, role, loading, refreshProfile } = useAuthContext();
+  const { user, profile, role, loading } = useAuthContext();
   const [showLogin, setShowLogin] = useState(false);
-  const [showEditProfile, setShowEditProfile] = useState(false);
 
   const isModerator = role === "moderator";
   const canCreateListings = LISTING_ROLES.includes(role);
@@ -83,17 +86,6 @@ export default function Header({ onAddListing, onSellerDashboard, onBuyerDashboa
 
             {!loading && user && (
               <button
-                onClick={() => setShowEditProfile(true)}
-                title="Edit profile"
-                className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-wide px-3 py-2 rounded bg-transparent text-[#EDE8DC]/70 border border-[#EDE8DC]/30 hover:brightness-110 transition"
-              >
-                <UserCog size={14} />
-                Edit profile
-              </button>
-            )}
-
-            {!loading && user && (
-              <button
                 onClick={handleLogout}
                 title={profile?.name ? `Log out (${profile.name})` : "Log out"}
                 className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-wide px-3 py-2 rounded bg-transparent text-[#EDE8DC]/70 border border-[#EDE8DC]/30 hover:brightness-110 transition"
@@ -128,15 +120,6 @@ export default function Header({ onAddListing, onSellerDashboard, onBuyerDashboa
 
       {showLogin && (
         <LoginForm onClose={() => setShowLogin(false)} onSuccess={() => setShowLogin(false)} />
-      )}
-
-      {showEditProfile && user && (
-        <EditProfileModal
-          userId={user.id}
-          profile={profile}
-          onClose={() => setShowEditProfile(false)}
-          onSaved={refreshProfile}
-        />
       )}
     </>
   );
