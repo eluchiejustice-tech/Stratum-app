@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { X, Eye, EyeOff } from "lucide-react";
-import { signIn, signUp, requestPasswordReset, resendVerification, signInWithGoogle, signInWithFacebook } from "../services/auth";
+import { signIn, signUp, requestPasswordReset, resendVerification, signInWithGoogle } from "../services/auth";
 import RoleSelect from "./RoleSelect";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -29,8 +29,9 @@ export default function LoginForm({ onClose, onSuccess }) {
   const [signupBlockedExisting, setSignupBlockedExisting] = useState(false);
 
   // Consent — required before email/password account creation. OAuth
-  // (Google/Facebook) intentionally does not use this; see the passive
-  // disclaimer text rendered near those buttons instead.
+  // (Google; Facebook temporarily removed from the UI, see comment near
+  // the OAuth buttons below) intentionally does not use this checkbox;
+  // see the passive disclaimer text rendered near the button instead.
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   // Resend verification — scoped to the signup-success state only.
@@ -258,15 +259,17 @@ export default function LoginForm({ onClose, onSuccess }) {
               Continue with Google
             </button>
 
-            <button
-              onClick={() => signInWithFacebook()}
-              className="w-full mt-2 flex items-center justify-center gap-2 bg-[#1877F2] text-white font-mono text-sm uppercase tracking-wide py-2.5 rounded border border-[#1877F2] hover:brightness-95 transition"
-            >
-              Continue with Facebook
-            </button>
+            {/* Facebook sign-in temporarily removed from the UI (not from
+                services/auth.js — signInWithFacebook() is untouched and
+                ready to restore). The Meta app is stuck in Development
+                Mode / pending App Review, which silently stalls login for
+                any Facebook account that isn't an app Admin/Tester. Once
+                App Review passes (or the app is added to Live mode with
+                testers), re-add this button and restore "Facebook" in the
+                disclaimer text below. */}
 
             <p className="text-[10px] text-[#3D4148]/60 text-center mt-2 leading-snug">
-              By continuing with Google or Facebook, you agree to Stratum's{" "}
+              By continuing with Google, you agree to Stratum's{" "}
               <a
                 href="/terms"
                 target="_blank"
