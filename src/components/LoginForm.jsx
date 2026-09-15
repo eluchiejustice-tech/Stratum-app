@@ -28,6 +28,11 @@ export default function LoginForm({ onClose, onSuccess }) {
   const [showSignupConfirm, setShowSignupConfirm] = useState(false);
   const [signupBlockedExisting, setSignupBlockedExisting] = useState(false);
 
+  // Consent — required before email/password account creation. OAuth
+  // (Google/Facebook) intentionally does not use this; see the passive
+  // disclaimer text rendered near those buttons instead.
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+
   // Resend verification — scoped to the signup-success state only.
   const [resendLoading, setResendLoading] = useState(false);
   const [resendError, setResendError] = useState("");
@@ -63,6 +68,11 @@ export default function LoginForm({ onClose, onSuccess }) {
     if (signupLoading) return;
     setSignupError("");
     setSignupBlockedExisting(false);
+
+    if (!agreedToTerms) {
+      setSignupError("You must agree to the Terms of Service and Privacy Policy to create an account.");
+      return;
+    }
 
     const trimmedEmail = signupEmail.trim();
 
@@ -255,6 +265,28 @@ export default function LoginForm({ onClose, onSuccess }) {
               Continue with Facebook
             </button>
 
+            <p className="text-[10px] text-[#3D4148]/60 text-center mt-2 leading-snug">
+              By continuing with Google or Facebook, you agree to Stratum's{" "}
+              <a
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-[#15130F]"
+              >
+                Terms of Service
+              </a>{" "}
+              and{" "}
+              <a
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-[#15130F]"
+              >
+                Privacy Policy
+              </a>
+              .
+            </p>
+
             <p className="text-xs text-[#3D4148] mt-3 text-center">
               Don't have an account?{" "}
               <button
@@ -326,6 +358,35 @@ export default function LoginForm({ onClose, onSuccess }) {
               <RoleSelect value={signupRole} onChange={setSignupRole} />
             </div>
 
+            <label className="flex items-start gap-2 text-xs text-[#3D4148] mb-2">
+              <input
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                I agree to the{" "}
+                <a
+                  href="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-[#15130F]"
+                >
+                  Terms of Service
+                </a>{" "}
+                and{" "}
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-[#15130F]"
+                >
+                  Privacy Policy
+                </a>
+              </span>
+            </label>
+
             {signupError && (
               <p className="text-xs text-[#8a3b3b] mt-1 font-mono">{signupError}</p>
             )}
@@ -341,7 +402,7 @@ export default function LoginForm({ onClose, onSuccess }) {
 
             <button
               onClick={handleSignup}
-              disabled={signupLoading}
+              disabled={signupLoading || !agreedToTerms}
               className="w-full mt-3 bg-[#15130F] text-[#EDE8DC] font-mono text-sm uppercase tracking-wide py-2.5 rounded hover:bg-[#3D4148] transition disabled:opacity-50"
             >
               {signupLoading ? "Creating account..." : "Sign up"}
