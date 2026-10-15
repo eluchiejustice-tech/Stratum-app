@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Layers, Plus, Lock, Shield, LogOut, LayoutDashboard, TrendingUp } from "lucide-react";
+import { Layers, Plus, Lock, Shield, LogOut, LayoutDashboard, TrendingUp, Factory } from "lucide-react";
 import { useAuthContext } from "../context/AuthContext";
 import { signOut } from "../services/auth";
 import LoginForm from "./LoginForm";
@@ -27,7 +27,7 @@ const LISTING_ROLES = ["miner_supplier", "company", "mineral_agent", "moderator"
 // Stratum polish pass — it now lives inside both BuyerDashboardPage.jsx
 // and SellerDashboardPage.jsx's Quick Actions, each reusing the same
 // EditProfileModal. This file no longer renders that modal at all.
-export default function Header({ onAddListing, onSellerDashboard, onBuyerDashboard, onMarketIntelligence }) {
+export default function Header({ onAddListing, onSellerDashboard, onBuyerDashboard, onMarketIntelligence, onProcessingDirector }) {
   const { user, profile, role, loading } = useAuthContext();
   const [showLogin, setShowLogin] = useState(false);
 
@@ -81,6 +81,12 @@ export default function Header({ onAddListing, onSellerDashboard, onBuyerDashboa
               >
                 <LayoutDashboard size={14} />
                 My dashboard
+              </button>
+            )}
+
+            {!loading && user && onProcessingDirector && (
+              <button onClick={onProcessingDirector} className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-wide px-3 py-2 rounded border border-[#EDE8DC]/30">
+                <Factory size={14} /> Mill operations
               </button>
             )}
 

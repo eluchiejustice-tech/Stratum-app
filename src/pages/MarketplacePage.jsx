@@ -31,6 +31,7 @@ export default function MarketplacePage({
   onSellerDashboard,
   onBuyerDashboard,
   onMarketIntelligence,
+  onProcessingDirector,
 }) {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
@@ -191,6 +192,7 @@ export default function MarketplacePage({
         onSellerDashboard={onSellerDashboard}
         onBuyerDashboard={onBuyerDashboard}
         onMarketIntelligence={onMarketIntelligence}
+        onProcessingDirector={onProcessingDirector}
       />
 
       <main className="max-w-4xl mx-auto px-5 sm:px-8 py-6">

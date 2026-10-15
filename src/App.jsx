@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import MarketplacePage from "./pages/MarketplacePage";
 import SellerProfilePage from "./pages/SellerProfilePage";
 import ListingDetailPage from "./pages/ListingDetailPage";
@@ -15,6 +15,8 @@ import ContactPage from "./pages/ContactPage";
 import Footer from "./components/Footer";
 import { AuthProvider } from "./context/AuthContext";
 
+const ProcessingDirectorPage = lazy(() => import("./pages/ProcessingDirectorPage"));
+
 function viewFromLocation() {
   const path = window.location.pathname;
   if (path === "/privacy") return "privacy";
@@ -23,6 +25,8 @@ function viewFromLocation() {
   if (new URLSearchParams(window.location.search).get("view") === "reset-password") {
     return "resetPassword";
   }
+  if (new URLSearchParams(window.location.search).get("view") === "processing-director") return "processingDirector";
+  if (new URLSearchParams(window.location.search).get("view") === "market-intelligence") return "marketIntelligence";
   return "marketplace";
 }
 
@@ -30,6 +34,17 @@ export default function App() {
   const [view, setView] = useState(viewFromLocation);
   const [selectedSellerId, setSelectedSellerId] = useState(null);
   const [selectedListingId, setSelectedListingId] = useState(null);
+
+  useEffect(() => {
+    const restore = () => setView(viewFromLocation());
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, []);
+
+  const openProcessingDirector = () => {
+    window.history.pushState({}, "", "/?view=processing-director");
+    setView("processingDirector");
+  };
 
   const openSellerProfile = (sellerId) => {
     setSelectedSellerId(sellerId);
@@ -50,6 +65,7 @@ export default function App() {
   };
 
   const openMarketIntelligence = () => {
+    window.history.pushState({}, "", "/?view=market-intelligence");
     setView("marketIntelligence");
   };
 
@@ -100,7 +116,11 @@ export default function App() {
         <ResetPasswordPage onComplete={exitResetPassword} />
       ) : (
         <>
-          {view === "sellerProfile" && selectedSellerId ? (
+          {view === "processingDirector" ? (
+            <Suspense fallback={<p role="status">Loading mill operations…</p>}>
+              <ProcessingDirectorPage onBack={backToMarketplace} onMarketIntelligence={openMarketIntelligence} />
+            </Suspense>
+          ) : view === "sellerProfile" && selectedSellerId ? (
             <SellerProfilePage
               sellerId={selectedSellerId}
               onBack={backToMarketplace}
@@ -152,6 +172,7 @@ export default function App() {
               onListingClick={openListingDetail}
               onSellerDashboard={openSellerDashboard}
               onBuyerDashboard={openBuyerDashboard}
+              onProcessingDirector={openProcessingDirector}
               onMarketIntelligence={openMarketIntelligence}
             />
           )}

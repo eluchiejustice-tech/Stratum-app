@@ -1,0 +1,6 @@
+project_id = "stratum-app"
+
+# Gateway requests carry a camera credential; the handler authenticates every action.
+# Owner credential actions independently verify the signed-in JWT with getUser.
+[functions.processing-camera-events]
+verify_jwt = false
