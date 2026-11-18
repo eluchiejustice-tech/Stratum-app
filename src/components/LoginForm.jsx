@@ -2,10 +2,12 @@ import { useState } from "react";
 import { X, Eye, EyeOff } from "lucide-react";
 import { signIn, signUp, requestPasswordReset, resendVerification, signInWithGoogle } from "../services/auth";
 import RoleSelect from "./RoleSelect";
+import { useAuthContext } from "../context/AuthContext";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginForm({ onClose, onSuccess }) {
+  const { signInWithPi, piLoading, piError } = useAuthContext();
   const [mode, setMode] = useState("login"); // "login" | "signup" | "forgotPassword"
 
   // Login state
@@ -251,6 +253,18 @@ export default function LoginForm({ onClose, onSuccess }) {
             >
               {loading ? "Logging in..." : "Enter"}
             </button>
+
+            <button
+              onClick={async () => {
+                const result = await signInWithPi();
+                if (!result.error) onSuccess?.(result.data);
+              }}
+              disabled={piLoading}
+              className="w-full mt-2 bg-[#B8922F] text-[#15130F] font-mono text-sm uppercase tracking-wide py-2.5 rounded hover:brightness-110 transition disabled:opacity-50"
+            >
+              {piLoading ? "Connecting to Pi…" : "Continue with Pi Network"}
+            </button>
+            {piError && <p className="text-xs text-[#8a3b3b] mt-2 font-mono">{piError}</p>}
 
             <button
               onClick={() => signInWithGoogle()}
