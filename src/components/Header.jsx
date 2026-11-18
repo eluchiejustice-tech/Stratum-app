@@ -28,7 +28,7 @@ const LISTING_ROLES = ["miner_supplier", "company", "mineral_agent", "moderator"
 // and SellerDashboardPage.jsx's Quick Actions, each reusing the same
 // EditProfileModal. This file no longer renders that modal at all.
 export default function Header({ onAddListing, onSellerDashboard, onBuyerDashboard, onMarketIntelligence }) {
-  const { user, profile, role, loading } = useAuthContext();
+  const { user, profile, role, loading, piUser, signOutPi } = useAuthContext();
   const [showLogin, setShowLogin] = useState(false);
 
   const isModerator = role === "moderator";
@@ -36,6 +36,7 @@ export default function Header({ onAddListing, onSellerDashboard, onBuyerDashboa
 
   const handleLogout = async () => {
     await signOut();
+    signOutPi();
   };
 
   return (
@@ -84,7 +85,7 @@ export default function Header({ onAddListing, onSellerDashboard, onBuyerDashboa
               </button>
             )}
 
-            {!loading && user && (
+            {!loading && (user || piUser) && (
               <button
                 onClick={handleLogout}
                 title={profile?.name ? `Log out (${profile.name})` : "Log out"}
@@ -95,7 +96,13 @@ export default function Header({ onAddListing, onSellerDashboard, onBuyerDashboa
               </button>
             )}
 
-            {!loading && !user && (
+            {!loading && piUser && (
+              <span className="font-mono text-xs text-[#B8922F] px-2 py-2" title="Verified by Pi App Studio">
+                π @{piUser.username}
+              </span>
+            )}
+
+            {!loading && !user && !piUser && (
               <button
                 onClick={() => setShowLogin(true)}
                 title="Log in"
